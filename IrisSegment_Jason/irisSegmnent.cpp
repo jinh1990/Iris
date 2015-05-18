@@ -313,4 +313,5 @@ void cal_canny_high_thresd(Mat src, float ratio, int& high_thresd)
 	cout<<"high_thresd = "<<high_thresd<<endl;
 
 	cout<<"It's the lastest version."<<endl;
+	cout << "fuck" << endl;
 }
