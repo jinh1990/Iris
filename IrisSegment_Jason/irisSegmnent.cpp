@@ -200,8 +200,8 @@ void main()
 	int rst_iris_rds = iris_rds;
 	int rst_pupil_rds = pupil_rds;
 
-	//circle(img,rst_iris_center,rst_iris_rds,cv::Scalar(255));
-	//circle(img,rst_pupil_center,rst_pupil_rds,cv::Scalar(255));
+	circle(img,rst_iris_center,rst_iris_rds,cv::Scalar(255));
+	circle(img,rst_pupil_center,rst_pupil_rds,cv::Scalar(255));
 
 	//cvNamedWindow( "better_result", 1 );
 	//imshow("better_result", img);
@@ -223,6 +223,9 @@ void main()
 	time_cost = cur_time - last_time;
 	cout<<"Uper eyelid location time_cost = "<<time_cost<<endl;
 	last_time = clock();
+
+	drawPolynomial(img,1,coffs_lower);
+	drawPolynomial(img,2,coffs_upper);
 
 	Mat mask(img_enhanced.size(),CV_8UC1);
 	//mask.setTo(255);
