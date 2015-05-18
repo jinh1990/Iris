@@ -22,7 +22,7 @@ void cal_canny_high_thresd(Mat src, float ratio, int& high_thresd);
 
 void main()
 {
-	Mat img = imread("C:\\Users\\pebble\\Desktop\\66_Jun_Liu_iris_15_04_22_04_49_49.jpg",1);
+	Mat img = imread("66_Jun_Liu_iris_15_04_22_04_49_49.jpg",1);
 
  	if (img.type() != CV_8UC1)
  	{
