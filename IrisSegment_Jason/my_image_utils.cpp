@@ -667,13 +667,13 @@ void findCenter(Mat edgemap, int* radiusRange, int points_gap, Point &center_poi
 
 	Mat votes_left = Mat::ones(edgemap.rows, edgemap.cols, CV_8UC1);
 	Mat votes_right = Mat::ones(edgemap.rows, edgemap.cols, CV_8UC1);
-	Mat mark_mat = Mat::zeros(edgemap.rows, edgemap.cols, CV_8UC1);
+	Mat mark_mat = Mat::zeros(edgemap.rows, edgemap.cols, CV_8SC1);
 
 	for (int i = 0; i < num_of_lines; i++)
 	{
 		vector<Point> Idx = contours[i];
 		int len = Idx.size();
-		if (len < 10)
+		if (len < 20)
 		{
 			continue;
 		}
@@ -681,11 +681,11 @@ void findCenter(Mat edgemap, int* radiusRange, int points_gap, Point &center_poi
 		{
 			int y = Idx[j].y;
 			int x = Idx[j].x;
-			if (mark_mat.at<unsigned char>(y,x) != 0)
+			if (mark_mat.ptr<unsigned char>(y)[x] != 0)
 			{
 				continue;
 			}
-			mark_mat.at<unsigned char>(y,x) = 1;
+			mark_mat.ptr<unsigned char>(y)[x] = 1;
 			Point P1 = Idx[j-points_gap];
 			Point P2 = Idx[j+points_gap];
 			if (P1.x == P2.x)
@@ -738,7 +738,7 @@ void findCenter(Mat edgemap, int* radiusRange, int points_gap, Point &center_poi
 					}
 					else
 					{
-						votes_left.at<unsigned char>(yc,xc)++;
+						votes_left.ptr<unsigned char>(yc)[xc]++;
 					}
 				}
 			}
@@ -754,7 +754,7 @@ void findCenter(Mat edgemap, int* radiusRange, int points_gap, Point &center_poi
 					}
 					else
 					{
-						votes_right.at<unsigned char>(yc,xc)++;
+						votes_right.ptr<unsigned char>(yc)[xc]++;
 					}
 				}
 			}
@@ -764,22 +764,28 @@ void findCenter(Mat edgemap, int* radiusRange, int points_gap, Point &center_poi
 	blur(votes_left, votes_left, cv::Size(3,3));
 	blur(votes_right, votes_right, cv::Size(3,3));
 
-	Mat votes = Mat::zeros(votes_left.size(),CV_8UC1);
+	Mat votes = Mat::zeros(votes_left.size(),CV_32FC1);
 	int max_value = 0;
 	//Point max_position(0,0);
 	for (int i = 0; i < votes.rows; i++)
 	{
 		for (int j = 0; j < votes.cols; j++)
 		{
-			votes.at<unsigned char>(i,j) = votes_left.at<unsigned char>(i,j)*votes_right.at<unsigned char>(i,j) - 1;
-			if (max_value < votes.at<unsigned char>(i,j))
+			votes.ptr<float>(i)[j] = votes_left.ptr<unsigned char>(i)[j]*votes_right.ptr<unsigned char>(i)[j] - 1;
+			
+			if (max_value < votes.ptr<float>(i)[j])
 			{
-				max_value = votes.at<unsigned char>(i,j);
+				max_value = votes.ptr<float>(i)[j];
 				center_point.x = j;
 				center_point.y = i;
 			}
 		}
 	}
+
+	//cvNamedWindow( "better_result", 1 );
+	//imshow("better_result", votes);
+	//cvWaitKey(0);
+	//cvDestroyWindow( "better_result" );
 
 	//for (int i = 0; i < votes.rows; i++)
 	//{
@@ -823,20 +829,20 @@ void find_radius(Mat edgemap, Point center_point, int* radiusRange, int searchRa
 	{
 		for (int j = 0; j < edgemap.cols; j++)
 		{
-			edgemap.at<unsigned char>(i,j) = 0;
+			edgemap.ptr<unsigned char>(i)[j] = 0;
 		}		
 	}
 	Point center_output(0,0);
 	int rds_outpoint = 0;
 	int grade = 0;
-
+	cout<<"1"<<endl;
 	vector<int> X, Y;
 
 	for (int i = 0; i < edgemap.rows; i++)
 	{
 		for (int j = 0; j < edgemap.cols; j++)
 		{
-			if (edgemap.at<unsigned char>(i,j) != 0)
+			if (edgemap.ptr<unsigned char>(i)[j] != 0)
 			{
 				Y.push_back(i);
 				X.push_back(j);
@@ -855,7 +861,7 @@ void find_radius(Mat edgemap, Point center_point, int* radiusRange, int searchRa
 
 	memset(x_axis,0,sizeof(int)*len);			
 	memset(y_axis,0,sizeof(int)*len);
-
+	cout<<"2"<<endl;
 	for (int i = center_point.x - searchRange; i < center_point.x + searchRange; i++)
 	{
 		for (int j = center_point.y - searchRange; j < center_point.y + searchRange; j++)
@@ -906,8 +912,8 @@ void find_radius(Mat edgemap, Point center_point, int* radiusRange, int searchRa
 			}
 		}
 	}
-
-	delete[] r;
+	cout<<"3"<<endl;
+	//delete[] r;
 	//delete[] x_axis;
 	//delete[] y_axis;
 }
@@ -998,9 +1004,6 @@ void find_pupil_radius(Mat edgemap, Point center_point, int* radiusRange, int se
 		}
 	}
 
-	cout<<"output_center = "<<output_center<<endl;
-	cout<<"output_radius = "<<output_radius<<endl;
-
 	delete[] r;
 	delete[] x_axis;
 	delete[] y_axis;
@@ -1022,15 +1025,12 @@ void mask_lower_region(Mat img, Point center, int radius, double* extend, Mat& m
 
 	double r_range[2] = {extend[0]*radius,extend[1]*radius};
 
-	cout<<"1"<<endl;
 	double angles1[2] = {angles[0],angles[1]};
 	thresh_angle_range(img,center,r_range,angles1,thresh_high[0],thresh_low[0],quality[0]);
 
-	cout<<"2"<<endl;
 	double angles2[2] = {angles[1],angles[2]};
 	thresh_angle_range(img,center,r_range,angles2,thresh_high[1],thresh_low[1],quality[1]);
 
-	cout<<"3"<<endl;
 	double angles3[2] = {angles[2],angles[3]};
 	thresh_angle_range(img,center,r_range,angles3,thresh_high[2],thresh_low[2],quality[2]);
 
@@ -1080,15 +1080,10 @@ void get_reflection_region( Mat img, Mat region, double* thresh )
  
 void thresh_angle_range(Mat img, Point center, double* radius_range, double* angles, double& thresh, double& thresh_low, double& quality)
 {
-	cout<<"1.1"<<endl;
 	Mat region;
 	int img_size[2] = {img.rows,img.cols};
 	get_sector_region(center,radius_range,angles,img_size,region);
-	cvNamedWindow( "better_result", 1 );
-	imshow("better_result", region);
-	cvWaitKey(0);
-	cvDestroyWindow( "better_result" );
-	cout<<"1.2"<<endl;
+
 	Mat masked_img = Mat::zeros(img.size(),CV_8UC1);
 	for (int i = 0; i < img.rows; i++)
 	{
@@ -1100,9 +1095,9 @@ void thresh_angle_range(Mat img, Point center, double* radius_range, double* ang
 			}
 		}
 	}
-	cout<<"1.3"<<endl;
+
 	cal_hist_thresh(masked_img,thresh,thresh_low,quality);
-	cout<<"1.4"<<endl;
+
 }
 
 void get_sector_region(Point center, double* radii, double* angles, int* size, Mat& region)
@@ -1526,7 +1521,7 @@ int fit_lower_eyelid( Mat img, Point iris_center, int iris_rds, Point pupil_cent
 	{
 		D_new.ptr<float>(i)[0] = D.ptr<float>(i)[ind.x];
 	}
-	cout<<"8"<<endl;
+
 	Mat mu_mat, sigma_mat;
 	meanStdDev(D_new,mu_mat,sigma_mat);
 	double mu = mu_mat.ptr<double>(0)[0];
@@ -1597,13 +1592,9 @@ int fit_upper_eyelid( Mat& img, Point iris_center, int iris_rds, Point pupil_cen
 	int rows = img.rows;
 	int cols = img.cols;
 
-	Mat Xmap = Mat::zeros(rows,cols,CV_8UC1);
-	Mat Ymap = Mat::zeros(rows,cols,CV_8UC1);
-	meshgrid(Range(1, cols),Range(1,rows),Xmap,Ymap);
-
 	Mat struct_map(img.size(),CV_8UC1);
 	//soble_double_direction(img,struct_map);
-	Canny(img,struct_map,50,80);
+	Canny(img,struct_map,50,60);
 
 	Mat dymap = Mat::zeros(img.size(),CV_8UC1);
 
@@ -1813,7 +1804,7 @@ int fit_upper_eyelid( Mat& img, Point iris_center, int iris_rds, Point pupil_cen
 		{
 			for (int j = 0; j < cols; j++)
 			{
-				if (abs(coffs.ptr<unsigned char>(0)[0]*Xmap.ptr<unsigned char>(i)[j]*Xmap.ptr<unsigned char>(i)[j] + coffs.ptr<unsigned char>(1)[0]*Xmap.ptr<unsigned char>(i)[j] + coffs.ptr<unsigned char>(2)[0] - Ymap.ptr<unsigned char>(i)[j]) < 1.5)
+				if (abs(coffs.ptr<unsigned char>(0)[0]*j*j + coffs.ptr<unsigned char>(1)[0]*j + coffs.ptr<unsigned char>(2)[0] - i) < 1.5)
 				{
 					region.ptr<unsigned char>(i)[j]  = 255;
 					imr.ptr<unsigned char>(i)[j]  = 0;
@@ -1972,8 +1963,8 @@ int eyelash_pixels_location(Mat& src, Point iris_center, int iris_rds, Point pup
 
 	stand = sqrt(s/IR_points.size());
 
-	int T_low = mean - 3.5*stand;
-	int T_high = mean + 2.5*stand;
+	int T_low = mean - 2.5*stand;
+	int T_high = mean + 1.5*stand;
 
 	for(i = 0; i < ES_points.size(); i++)
 	{

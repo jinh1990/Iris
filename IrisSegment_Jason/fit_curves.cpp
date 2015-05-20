@@ -1,6 +1,8 @@
 #include "fit_curves.h"
 #include <cmath>
 
+#include "iostream"
+
 int fitPolynomial(vector<Point2f> pts, int nd, Mat &dst, Mat &pic)
 {
 	
@@ -55,9 +57,10 @@ int drawPolynomial(Mat coef, int type, Mat &pic)
 	{
 		return 0;
 	}
-
+	
 	int xmax = pic.cols;
 	int ymax = pic.rows;
+
 	for (int x = 0; x < xmax; x++)
 	{
 		Mat X(coef.rows, 1, CV_32FC1);
@@ -66,7 +69,7 @@ int drawPolynomial(Mat coef, int type, Mat &pic)
 		//X.at<float>(0, 2) = 1;
 		for (int j = 0; j < X.rows; j++)
 		{
-			X.at<float>(j, 0) = static_cast<float>(pow(x, (X.rows - 1) - j));
+			X.ptr<float>(j)[0] = static_cast<float>(pow(x, (X.rows - 1) - j));
 		}
 
 		int y = cvRound(coef.dot(X));
@@ -77,7 +80,7 @@ int drawPolynomial(Mat coef, int type, Mat &pic)
 			{
 				continue;
 			}
-			pic.at<unsigned char>(y, x) = 0;
+			pic.ptr<unsigned char>(y)[x] = 0;
 		}
 		else if (type == 1)
 		{
@@ -85,7 +88,7 @@ int drawPolynomial(Mat coef, int type, Mat &pic)
 
 			for (int j = y; j < ymax; j++)
 			{
-				pic.at<unsigned char>(j, x) = 0;
+				pic.ptr<unsigned char>(j)[x] = 0;
 			}
 		}
 		else if (type == 2)
@@ -94,7 +97,7 @@ int drawPolynomial(Mat coef, int type, Mat &pic)
 
 			for (int j = 0; j < y; j++)
 			{
-				pic.at<unsigned char>(j, x) = 0;
+				pic.ptr<unsigned char>(j)[x] = 0;
 			}
 		}
 	}
