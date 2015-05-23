@@ -1984,3 +1984,529 @@ int eyelash_pixels_location(Mat& src, Point iris_center, int iris_rds, Point pup
 
 	return 0;
 }
+
+int get_rtv_l1_contour(Mat img, Mat& edgemap, Mat& im_smooth)
+{
+	rtv_l1_smooth2(img,0.02,0.15,3,0.01,5,im_smooth);
+	soble_double_direction(im_smooth,edgemap);
+
+	int rows = img.rows;
+	int cols = img.cols;
+
+	int width = cols/2;
+	int height = rows/2;
+
+	for (double i = -width; i < cols-width; i++)
+	{
+		for (double j = -height; j < rows-height; j++)
+		{
+			double tmp = i*i/((float)width*(float)width) + j*j/((float)height*height);
+			if (tmp >= 1)
+			{
+				edgemap.ptr<unsigned char>((int)i+width)[(int)j+height] = 0;
+			}
+		}
+	}
+
+	return 0;
+}
+
+int rtv_l1_smooth2(Mat img, double lambda, double theta, double sigma, double ep, double maxIter, Mat& dst)
+{
+	if (maxIter == 0)
+	{
+		maxIter = 5;
+	}
+	
+	if (ep == 0)
+	{
+		ep = 0.001;
+	}
+	
+	if (sigma == 0)
+	{
+		sigma = 5;
+	}
+	
+	if (theta == 0)
+	{
+		theta = 0.01;
+	}
+
+	if (lambda == 0)
+	{
+		lambda = 0.005;
+	}
+	
+	int rows = img.rows;
+	int cols = img.cols;
+
+	int k = rows*cols;
+
+	Mat f = img.clone();
+	Mat u = img.clone();
+	Mat v = Mat::zeros(rows, cols, CV_8UC1);
+
+	
+
+	for (int i = 0; i < maxIter; i++)
+	{
+		computeU(u,v,f,lambda,theta,sigma,ep,k);
+		computeV(u,f,v,theta);
+		sigma = sigma/2.0 > 0.5?sigma/2.0:0.5;
+	}
+	return 0;
+}
+
+int gau_filter(Mat in, Mat g, Mat& dst)
+{
+	dst = conv2(in,g,CONVOLUTION_SAME);
+	dst = conv2(dst,g,CONVOLUTION_SAME);
+
+	return 0;
+}
+
+int computeU(Mat& u, Mat v, Mat f,double lambda,double theta, double sigma, double ep, int k)
+{
+	Mat fin = u.clone();
+	Mat fx = Mat::zeros(u.rows,u.cols,CV_8UC1);
+	Mat fy = Mat::zeros(u.rows,u.cols,CV_8UC1);
+
+	cout<<"11"<<endl;
+
+	for (int i = 0; i < u.rows; i++)
+	{
+		for (int j = 0; j < u.cols-1; j++)
+		{
+			fx.ptr<unsigned char>(i)[j] = u.ptr<unsigned char>(i)[j+1] - u.ptr<unsigned char>(i)[j];
+		}
+		fx.ptr<unsigned char>(i)[u.cols-1] = fx.ptr<unsigned char>(i)[u.cols-2];
+	}
+
+
+	for (int i = 0; i < u.cols; i++)
+	{
+		for (int j = 0; j < u.rows-1; j++)
+		{
+			fy.ptr<unsigned char>(j)[i] = u.ptr<unsigned char>(j+1)[i] - u.ptr<unsigned char>(j)[i];
+		}
+		fy.ptr<unsigned char>(u.rows-1)[i] = fy.ptr<unsigned char>(u.rows-2)[i];
+	}
+
+	double vareps_s = ep;
+	double vareps = 0.001;
+
+	Mat wto = Mat::zeros(fx.size(),CV_32FC1);
+	for (int i = 0; i < fx.rows; i++)
+	{
+		for (int j = 0; j < fx.cols; j++)
+		{
+			double tmp_value = sqrt((float)fx.ptr<unsigned char>(i)[j]*fx.ptr<unsigned char>(i)[j] + fy.ptr<unsigned char>(i)[j]*fy.ptr<unsigned char>(i)[j]) + 3.0;
+			tmp_value = tmp_value > vareps_s?tmp_value:vareps_s;
+			wto.ptr<float>(i)[j] = 1.0/tmp_value;
+		}
+	}
+	cout<<"002"<<endl;
+	Mat G_kernal;
+	fspecial(sigma,G_kernal);
+	Mat fbin;
+	cout<<"001"<<endl;
+	gau_filter(fin,G_kernal,fbin);
+	cout<<"000"<<endl;
+	cout<<fbin.ptr(0)[0]<<endl;
+
+	Mat gfx = Mat::zeros(u.rows,u.cols,CV_8UC1);
+	Mat gfy = Mat::zeros(u.rows,u.cols,CV_8UC1);
+
+	for (int i = 0; i < fbin.rows; i++)
+	{
+		for (int j = 0; j < fbin.cols-1; j++)
+		{
+			gfx.ptr<unsigned char>(i)[j] = fbin.ptr<float>(i)[j+1] - fbin.ptr<float>(i)[j];
+		}
+		gfx.ptr<unsigned char>(i)[fbin.cols-1] = gfx.ptr<unsigned char>(i)[fbin.cols-2];
+	}
+	for (int i = 0; i < fbin.cols; i++)
+	{
+		for (int j = 0; j < fbin.rows-1; j++)
+		{
+			gfy.ptr<unsigned char>(j)[i] = fbin.ptr<float>(j+1)[i] - fbin.ptr<float>(j)[i];
+		}
+		gfy.ptr<unsigned char>(fbin.rows-1)[i] = gfy.ptr<unsigned char>(fbin.rows-2)[i];
+	}
+
+	cout<<"111"<<endl;
+	Mat wtbx = Mat::zeros(fbin.size(),CV_32FC1);
+	Mat wtby = Mat::zeros(fbin.size(),CV_32FC1);
+	Mat wx = Mat::zeros(fbin.size(),CV_32FC1);
+	Mat wy = Mat::zeros(fbin.size(),CV_32FC1);
+	for (int i = 0; i < fbin.rows; i++)
+	{
+		for (int j = 0; j < fbin.cols; j++)
+		{
+			double tmp1 = (abs(gfx.ptr<unsigned char>(i)[j]) + 3.0) > vareps?(abs(gfx.ptr<unsigned char>(i)[j]) + 3.0):vareps;
+			wtbx.ptr<float>(i)[j] = 1.0/tmp1;
+
+			double tmp2 = (abs(gfy.ptr<unsigned char>(i)[j]) + 3.0) > vareps?(abs(gfy.ptr<unsigned char>(i)[j]) + 3.0):vareps;
+			wtby.ptr<float>(i)[j] = 1.0/tmp2;
+
+			wx.ptr<float>(i)[j] = wtbx.ptr<float>(i)[j]*wto.ptr<float>(i)[j];
+			wy.ptr<float>(i)[j] = wtby.ptr<float>(i)[j]*wto.ptr<float>(i)[j];
+		}
+	}
+
+	cout<<"222"<<endl;
+
+	for (int i = 0; i < wx.rows; i++)
+	{
+		wx.ptr<float>(i)[wx.cols-1] = 0;
+	}
+	for (int i = 0; i < wx.cols; i++)
+	{
+		wx.ptr<float>(wx.rows-1)[i] = 0;
+	}
+
+	cout<<"333"<<endl;
+
+	Mat dx = Mat::zeros(wx.rows*wx.cols,1,CV_32FC1);
+	Mat dy = Mat::zeros(wx.rows*wx.cols,1,CV_32FC1);
+	Mat B = Mat::zeros(wx.rows*wx.cols,2,CV_32FC1);
+	for (int i = 0; i < wx.rows; i++)
+	{
+		for (int j = 0; j < wx.cols; j++)
+		{
+			dx.ptr<float>(i*wx.cols+j)[0] = -lambda*theta*2*wx.ptr<float>(i)[j];
+			dy.ptr<float>(i*wx.cols+j)[0] = -lambda*theta*2*wy.ptr<float>(i)[j];
+			B.ptr<float>(i*wx.cols+j)[0] = -lambda*theta*2*wx.ptr<float>(i)[j];
+			B.ptr<float>(i*wx.cols+j)[1] = -lambda*theta*2*wy.ptr<float>(i)[j];
+		}
+	}
+
+	cout<<"444"<<endl;
+	int d[2] = {-wx.rows,-1};
+
+	Mat A;
+	spdiags(B,A,d,k,k);
+
+	cout<<"004"<<endl;
+
+	Mat e = dx.clone();
+	Mat s = dx.clone();
+
+	Mat w = Mat::zeros(wx.rows*wx.cols,1,CV_32FC1);
+	Mat n = Mat::zeros(wx.rows*wx.cols,1,CV_32FC1);
+	Mat D = Mat::zeros(wx.rows*wx.cols,1,CV_32FC1);
+
+	n.ptr<float>(0)[0] = dy.ptr<float>(0)[0];
+	for (int i = 0; i < w.rows; i++)
+	{
+		if (i < wx.rows)
+		{
+			w.ptr<float>(i)[0] = dx.ptr<float>(0)[0];
+		}
+		else
+		{
+			w.ptr<float>(i)[0] = dx.ptr<float>(i-wx.rows)[0];
+		}
+		if (i > 0)
+		{
+			n.ptr<float>(i)[0] = dy.ptr<float>(i-1)[0];
+		}
+	}
+	cout<<"555"<<endl;
+	Mat tmp;
+	add(e,w,tmp);
+	add(s,tmp,tmp);
+	add(n,tmp,tmp);
+
+	Mat tmp_one = Mat::ones(tmp.size(),CV_32FC1);
+
+	subtract(tmp_one,tmp,D);
+
+	Mat tmp_diags = Mat::zeros(k,k,CV_32FC1);
+
+	for (int i = 0; i < k; i++)
+	{
+		tmp_diags.ptr<float>(i)[i] = D.ptr<float>(i)[0];
+	}
+
+	Mat trans_A;
+	transpose(A,trans_A);
+	add(A,trans_A,A);
+	add(A,tmp_diags,A);
+
+	Mat tin;
+	subtract(f,v,tin);
+
+	int tmp_num = tin.rows*tin.cols;
+	Mat tin_col = Mat::zeros(tmp_num,1,CV_32FC1);
+	for (int i = 0; i < tin.cols; i++)
+	{
+		for (int j = 0; j < tin.rows; j++)
+		{
+			tin_col.ptr<float>(j*tin.cols+i)[0] = tin.ptr<float>(j)[i];
+		}
+	}
+	Mat tout;
+
+	solve(A,tin_col,tout,DECOMP_CHOLESKY);
+
+	for (int i = 0; i < u.cols; i++)
+	{
+		for (int j = 0; j < u.rows; j++)
+		{
+			u.ptr<float>(j)[i] = tout.ptr<float>(j*u.cols+i)[0];
+		}
+	}
+	
+	return 0;
+}
+
+int spdiags(Mat src, Mat& dst, int* d, int m, int n)
+{
+	int d_size = sizeof(d)/sizeof(d[0]);
+
+	dst = Mat::zeros(m,n,CV_32FC1);
+//	dst = Mat::zeros(100,100,CV_32FC1);
+	cout<<"d_size = "<<d_size<<endl;
+
+	for (int i = 0; i < d_size; i++)
+	{
+		int init_x = 0;
+		int init_y = 0;
+		if (d[i] <= 0)
+		{
+			init_y -= d[i];
+		}
+		else
+		{
+			init_x += d[i];
+		}
+		for (int j = 0; j < src.rows; j++)
+		{
+			if (init_x < n && init_y < m)
+			{
+				if (src.type() == CV_8UC1)
+				{
+					dst.ptr<unsigned char>(init_y++)[init_x++] = src.ptr<unsigned char>(i)[j];
+				}
+				else
+				{
+					dst.ptr<float>(init_y++)[init_x++] = src.ptr<float>(i)[j];
+				}
+			}
+			else
+			{
+				break;
+			}
+		}
+	}
+
+	return 0;
+}
+
+int fspecial(double sigma, Mat& G_kernal)
+{
+	int nWindowSize = int(5.0*sigma+0.5);
+	int nCenter = (nWindowSize)/2;   
+	//generate Gaussian kernal
+	G_kernal = Mat::zeros(1,nWindowSize,CV_32FC1);
+
+	double  dSum_1 = 0.0;                                  
+	//Gaussian function 
+	for(int i=0; i<nWindowSize; i++)  
+	{  
+		double nDis = (double)(i-nCenter);  
+		G_kernal.ptr<float>(0)[i] = exp(-(0.5)*nDis*nDis/(sigma*sigma))/(sqrt(2*3.14159)*sigma);  
+		dSum_1 += G_kernal.ptr<float>(0)[i];  
+	}  
+	for(int i=0; i<nWindowSize; i++)  
+	{  
+		G_kernal.ptr<float>(0)[i] /= dSum_1;                 
+	}  
+
+	return 0;
+}
+
+void cholesky_decomposition( const Mat& A, Mat& L )
+{
+	L = Mat::zeros( A.size(), CV_32F );
+	int rows = A.rows;
+
+	for( int i = 0; i < rows; ++i )
+	{
+		int j;
+		float sum;
+
+		for(j=0; j < i; ++j)//只求下三角 (i>j)
+		{
+			sum = 0;
+			for(int k=0; k<j; ++k)
+			{
+				sum += L.at<float>(i,k) * L.at<float>(j,k);
+			}
+			L.at<float>(i,j) = (A.at<float>(i,j) - sum) / L.at<float>(j,j);
+		}
+		sum = 0;
+		assert(i == j);
+		for (int k=0; k<j; ++k)//i == j
+		{
+			sum += L.at<float>(j,k) * L.at<float>(j,k);
+		}
+		L.at<float>(j,j) = sqrt(A.at<float>(j,j) - sum);
+
+	}
+
+}
+
+int computeV(Mat u, Mat f, Mat& v, double theta)
+{
+	subtract(f,u,v);
+
+	Mat a1 = Mat::zeros(v.size(),CV_8UC1);
+	Mat a2 = Mat::zeros(v.size(),CV_8UC1);
+	Mat a3 = Mat::zeros(v.size(),CV_8UC1);
+
+	for (int i = 0; i < v.rows; i++)
+	{
+		for (int j = 0; j < v.cols; j++)
+		{
+			if (v.ptr<float>(i)[j] > theta)
+			{
+				a1.ptr<unsigned char>(i)[j] = 255;
+			}
+			else if(v.ptr<float>(i)[j] < -theta)
+			{
+				a2.ptr<unsigned char>(i)[j] = 255;
+			}
+
+			if (a1.ptr<unsigned char>(i)[j] == 0 && a2.ptr<unsigned char>(i)[j] == 0)
+			{
+				a3.ptr<unsigned char>(i)[j] = 255;
+			}
+
+			if (a1.ptr<unsigned char>(i)[j] != 0)
+			{
+				v.ptr<float>(i)[j] -= theta;
+			}
+
+			if (a2.ptr<unsigned char>(i)[j] != 0)
+			{
+				v.ptr<float>(i)[j] += theta;
+			}
+
+			if (a3.ptr<unsigned char>(i)[j] != 0)
+			{
+				v.ptr<float>(i)[j] = 0;
+			}
+		}
+	}
+	return 0;
+}
+
+int cal_energy(Mat im_s, Mat im, double lambda, Mat G, double ep, Mat& rtv_e)
+{
+	float horizontal_fkx[3][3] = {{-1,0,1}, {-2,0,2}, {-1,0,1}};	//Gradient Direction 3	
+	Mat filterDirx = Mat(3, 3, CV_32FC1, horizontal_fkx);  
+	Mat dx;
+	filter2D(im_s, dx, -1, filterDirx);
+
+	float horizontal_fky[3][3] = {{-1,-2,-1}, {0,0,0}, {1,2,1}};	//Gradient Direction 3	
+	Mat filterDiry = Mat(3, 3, CV_32FC1, horizontal_fky);  
+	Mat dy;
+	filter2D(im_s, dy, -1, filterDiry);
+
+	Mat ux = conv2(dx,G,CONVOLUTION_SAME);
+	Mat uy = conv2(dy,G,CONVOLUTION_SAME);
+	for (int i = 0; i < ux.rows; i++)
+	{
+		for (int j = 0; j < ux.cols; j++)
+		{
+			ux.ptr<float>(i)[j] = 1/abs(ux.ptr<float>(i)[j]+ep);
+			uy.ptr<float>(i)[j] = 1/abs(uy.ptr<float>(i)[j]+ep);
+		}
+	}
+
+	ux = conv2(ux,G,CONVOLUTION_SAME);
+	uy = conv2(uy,G,CONVOLUTION_SAME);
+
+	Mat wx = Mat::zeros(dx.size(),CV_32FC1);
+	Mat wy = Mat::zeros(dy.size(),CV_32FC1);
+
+	for (int i = 0; i < wx.rows; i++)
+	{
+		for (int j = 0; j < wx.cols; j++)
+		{
+			wx.ptr<float>(i)[j] = 1/abs(dx.ptr<float>(i)[j] + ep);
+			wy.ptr<float>(i)[j] = 1/abs(dy.ptr<float>(i)[j] + ep);
+		}
+	}
+
+	Mat ux_col = Mat::zeros(ux.rows*ux.cols,1,CV_32FC1);
+	Mat wx_col = Mat::zeros(wx.rows*wx.cols,1,CV_32FC1);
+	Mat uy_col = Mat::zeros(uy.rows*uy.cols,1,CV_32FC1);
+	Mat wy_col = Mat::zeros(wy.rows*wy.cols,1,CV_32FC1);
+
+	Mat dx2_col = Mat::zeros(dx.rows*dx.cols,1,CV_32FC1);
+	Mat dy2_col = Mat::zeros(dy.rows*dy.cols,1,CV_32FC1);
+
+	for (int i = 0; i < ux.cols; i++)
+	{
+		for (int j = 0; j < ux.rows; j++)
+		{
+			ux_col.ptr<float>(j*ux.cols+i)[0] = ux.ptr<float>(j)[i];
+			wx_col.ptr<float>(j*ux.cols+i)[0] = wx.ptr<float>(j)[i];
+			uy_col.ptr<float>(j*ux.cols+i)[0] = uy.ptr<float>(j)[i];
+			wy_col.ptr<float>(j*ux.cols+i)[0] = wy.ptr<float>(j)[i];
+			dx2_col.ptr<float>(j*ux.cols+i)[0] = dx.ptr<float>(j)[i]*dx.ptr<float>(j)[i];
+			dy2_col.ptr<float>(j*ux.cols+i)[0] = dy.ptr<float>(j)[i]*dy.ptr<float>(j)[i];
+		}
+	}
+
+	Mat uwx,uwy;
+	multiply(ux_col,wx_col,uwx);
+	multiply(uy_col,wy_col,uwy);
+
+	Mat tmp_mul1, tmp_mul2;
+	multiply(uwx,dx2_col,tmp_mul1);
+	multiply(uwy,dy2_col,tmp_mul2);
+
+	Mat tmp_add;
+	add(tmp_mul1,tmp_mul2,tmp_add);
+
+	double rtv = sum(tmp_add)[0];
+	Mat diff = Mat::zeros(im.rows*im.cols,1,CV_32FC1);
+	for (int i = 0; i < im.cols; i++)
+	{
+		for (int j = 0; j < im.rows; j++)
+		{
+			diff.ptr<float>(j*im.cols*i)[0] = im_s.ptr<unsigned char>(j)[i] - im.ptr<unsigned char>(j)[i];
+		}
+	}
+	rtv_e = lambda*rtv + sum(abs(diff))[0];
+
+	return 0;
+}
+
+Mat conv2(const Mat &img, const Mat& ikernel, int type) 
+{
+	 Mat dst;
+	 Mat kernel;
+	 flip(ikernel,kernel,-1);
+	 Mat source = img;
+	 if(CONVOLUTION_FULL == type) 
+	 {
+	  source = Mat();
+	  const int additionalRows = kernel.rows-1, additionalCols = kernel.cols-1;
+	  copyMakeBorder(img, source, (additionalRows+1)/2, additionalRows/2, (additionalCols+1)/2, additionalCols/2, BORDER_CONSTANT, Scalar(0));
+	 }
+	 Point anchor(kernel.cols - kernel.cols/2 - 1, kernel.rows - kernel.rows/2 - 1);
+	 int borderMode = BORDER_CONSTANT;
+	 filter2D(source, dst, img.depth(), kernel, anchor, 0, borderMode);
+ 
+	 if(CONVOLUTION_VALID == type) 
+	 {
+		 dst = dst.colRange((kernel.cols-1)/2, dst.cols - kernel.cols/2).rowRange((kernel.rows-1)/2, dst.rows - kernel.rows/2);
+	 }
+	 return dst;
+}

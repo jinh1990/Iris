@@ -134,6 +134,19 @@ void main()
 
 	GaussianBlur(img_enhanced,img_enhanced,Size(7,7),0);
 
+	Mat img_smooth, edgemap;
+	get_rtv_l1_contour(img_enhanced,edgemap,img_smooth);
+
+	cvNamedWindow( "better_result", 1 );
+	cvNamedWindow( "img", 1 );
+	imshow("better_result", img_smooth);
+	imshow("img", edgemap);
+	cvWaitKey(0);
+	cvDestroyWindow( "better_result" );
+	cvDestroyWindow( "img" );
+
+	return;
+
 	int canny_h_thresd = 0;
 	cal_canny_high_thresd(img_enhanced,0.3,canny_h_thresd);
 

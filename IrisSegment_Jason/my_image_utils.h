@@ -10,6 +10,10 @@
 using namespace std;
 using namespace cv;
 
+#define CONVOLUTION_FULL 1
+#define CONVOLUTION_SAME 2
+#define CONVOLUTION_VALID 4
+
 int SSREnhancement(const cv::gpu::GpuMat src, Mat &dst);
 
 int SSREnhancement(Mat src, Mat &dst);
@@ -64,5 +68,25 @@ int process_ES_region( Mat img, Mat& mask, Point center, int rds, Mat& coffs, do
 void soble_double_direction(Mat img, Mat& result);
 
 int eyelash_pixels_location(Mat& src, Point iris_center, int iris_rds, Point pupil_center, int pupil_rds, Vector<cv::Point>& eyelash_points);
+
+int get_rtv_l1_contour(Mat img, Mat& edgemap, Mat& im_smooth);
+
+int rtv_l1_smooth2(Mat img, double lambda, double theta, double sigma, double ep, double maxIter, Mat& dst);
+
+Mat conv2(const Mat &img, const Mat& ikernel, int type);
+
+int computeU(Mat& u, Mat v, Mat f,double lambda,double theta, double sigma, double ep, int k);
+
+int spdiags(Mat src, Mat& dst, int* d, int m, int n);
+
+void cholesky_decomposition( const Mat& A, Mat& L );
+
+int computeV(Mat u, Mat f, Mat& v, double theta);
+
+int cal_energy(Mat im_s, Mat im, double lambda, Mat G, double ep, Mat& rtv_e);
+
+int fspecial(double sigma, Mat& G_kernal);
+
+int gau_filter(Mat in, Mat g, Mat& dst);
 
 #endif
