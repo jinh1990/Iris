@@ -824,18 +824,24 @@ void findCenter(Mat edgemap, int* radiusRange, int points_gap, Point &center_poi
 
 void find_radius(Mat edgemap, Point center_point, int* radiusRange, int searchRange, Point& output_center, int& output_radius)
 {
-	int upper_bound = 1>(center_point.y - searchRange - 2)?1:(center_point.y - searchRange - 2);
-	for (int i = 0; i < upper_bound; i++)
-	{
-		for (int j = 0; j < edgemap.cols; j++)
-		{
-			edgemap.ptr<unsigned char>(i)[j] = 0;
-		}		
-	}
+	//int upper_bound = 1>(center_point.y - searchRange - 2)?1:(center_point.y - searchRange - 2);
+	//for (int i = 0; i < upper_bound; i++)
+	//{
+	//	for (int j = 0; j < edgemap.cols; j++)
+	//	{
+	//		edgemap.ptr<unsigned char>(i)[j] = 0;
+	//	}		
+	//}
+
+	//cvNamedWindow( "better_result", 1 );
+	//imshow("better_result", edgemap);
+	//cvWaitKey(0);
+	//cvDestroyWindow( "better_result" );
+
 	Point center_output(0,0);
 	int rds_outpoint = 0;
 	int grade = 0;
-	cout<<"1"<<endl;
+
 	vector<int> X, Y;
 
 	for (int i = 0; i < edgemap.rows; i++)
@@ -852,6 +858,8 @@ void find_radius(Mat edgemap, Point center_point, int* radiusRange, int searchRa
 
 	int num = X.size();
 
+	cout<<"num = "<<num<<endl;
+
 	int* r = new int[num];
 	memset(r,0,sizeof(int)*num);
 
@@ -859,9 +867,9 @@ void find_radius(Mat edgemap, Point center_point, int* radiusRange, int searchRa
 	int* x_axis = new int[1000];
 	int* y_axis = new int[1000];
 
-	memset(x_axis,0,sizeof(int)*len);			
-	memset(y_axis,0,sizeof(int)*len);
-	cout<<"2"<<endl;
+	memset(x_axis,0,sizeof(int)*1000);			
+	memset(y_axis,0,sizeof(int)*1000);
+
 	for (int i = center_point.x - searchRange; i < center_point.x + searchRange; i++)
 	{
 		for (int j = center_point.y - searchRange; j < center_point.y + searchRange; j++)
@@ -875,9 +883,10 @@ void find_radius(Mat edgemap, Point center_point, int* radiusRange, int searchRa
 				//y_axis[index]++;
 			}
 		
-			memset(x_axis,0,sizeof(int)*len);			
-			memset(y_axis,0,sizeof(int)*len);
-			float gap = (((float)radiusRange[1] - radiusRange[0] + 2)/(len-1)) == 0?INF:(((float)radiusRange[1] - radiusRange[0] + 2)/(len-1));
+			memset(x_axis,0,sizeof(int)*1000);			
+			memset(y_axis,0,sizeof(int)*1000);
+			//float gap = (((float)radiusRange[1] - radiusRange[0] + 2)/(len-1)) == 0?INF:(((float)radiusRange[1] - radiusRange[0] + 2)/(len-1));
+			float gap = 1;
 			x_axis[0] = radiusRange[0] - 1;
 			x_axis[len-1] = radiusRange[1] + 1;
 			for(int m = 1; m < len-1; m++)
@@ -909,6 +918,90 @@ void find_radius(Mat edgemap, Point center_point, int* radiusRange, int searchRa
 				output_center.x = i;
 				output_center.y = j;
 				grade = grade_cur;
+			}
+		}
+	}
+	cout<<"3"<<endl;
+	//delete[] r;
+	//delete[] x_axis;
+	//delete[] y_axis;
+}
+
+void find_iris_radius(Mat edgemap, Point center_point, int* radiusRange, int searchRange, Point& output_center, int& output_radius)
+{
+	//cvNamedWindow( "better_result", 1 );
+	//imshow("better_result", edgemap);
+	//cvWaitKey(0);
+	//cvDestroyWindow( "better_result" );
+
+	Point center_output(0,0);
+	int rds_outpoint = 0;
+	int grade = 0;
+
+	vector<int> X, Y;
+
+	for (int i = 0; i < edgemap.rows; i++)
+	{
+		for (int j = 0; j < edgemap.cols; j++)
+		{
+			if (edgemap.ptr<unsigned char>(i)[j] != 0)
+			{
+				Y.push_back(i);
+				X.push_back(j);
+			}
+		}
+	}
+
+	int num = X.size();
+
+	cout<<"num = "<<num<<endl;
+
+	int* r = new int[num];
+	memset(r,0,sizeof(int)*num);
+
+	int len = radiusRange[1] - radiusRange[0] + 3;
+	int* x_axis = new int[1000];
+	int* y_axis = new int[1000];
+
+	memset(x_axis,0,sizeof(int)*1000);			
+	memset(y_axis,0,sizeof(int)*1000);
+
+	for (int i = center_point.x - searchRange; i < center_point.x + searchRange; i++)
+	{
+		for (int j = center_point.y - searchRange; j < center_point.y + searchRange; j++)
+		{
+
+			memset(x_axis,0,sizeof(int)*1000);			
+			memset(y_axis,0,sizeof(int)*1000);
+
+			//memset(r,0,sizeof(int)*num);
+			for (int k = 0; k < num; k++)
+			{
+				r[k] = sqrt((i-X[k])*(i-X[k]) + (j-Y[k])*(j-Y[k]));
+				y_axis[r[k]]++;
+				//int index = (r[k] - radiusRange[0]) >= 0?(r[k] - radiusRange[0]):0;
+				//index = (index<radiusRange[1])?index:(radiusRange[1]-1);
+				//y_axis[index]++;
+			}
+
+			int grade_cur = 0;
+			int index = 0;
+			for (int m = 1; m < 999; m++)
+			{
+				y_axis[m] = (y_axis[m] + y_axis[m-1] + y_axis[m+1])/3;
+				if (grade_cur < y_axis[m])
+				{
+					grade_cur = y_axis[m];
+					index = m;
+				}
+			}
+			if (grade_cur > grade)
+			{
+				output_radius = index;
+				output_center.x = i;
+				output_center.y = j;
+				grade = grade_cur;
+				cout<<"grade = "<<grade<<endl;
 			}
 		}
 	}
@@ -1562,7 +1655,7 @@ int fit_lower_eyelid( Mat img, Point iris_center, int iris_rds, Point pupil_cent
 	return 0;
 }
 
-void soble_double_direction(Mat img, Mat& result)
+void soble_double_direction(Mat img, Mat mask, double thresh, Mat& result)
 {
 	int scale = 1;
 	int delta = 0;
@@ -1583,6 +1676,42 @@ void soble_double_direction(Mat img, Mat& result)
 
 	/// Total Gradient (approximate)
 	addWeighted( abs_grad_x, 0.5, abs_grad_y, 0.5, 0, result );
+
+	for (int i = 0; i < img.rows; i++)
+	{
+		for (int j = 0; j < img.cols; j++)
+		{
+			if (mask.ptr<unsigned char>(i)[j] != 0 || result.ptr<unsigned char>(i)[j] < thresh)
+			{
+				result.ptr<unsigned char>(i)[j] = 0;
+			}
+			else
+			{
+				result.ptr<unsigned char>(i)[j] = 255;
+			}
+		}
+	}
+}
+
+void removeSmallBlobs(cv::Mat& im, double size)
+{
+	// Only accept CV_8UC1
+	if (im.channels() != 1 || im.type() != CV_8U)
+		return;
+
+	// Find all contours
+	std::vector<std::vector<cv::Point> > contours;
+	cv::findContours(im.clone(), contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
+
+	for (int i = 0; i < contours.size(); i++)
+	{
+		// Calculate contour area
+		double area = cv::contourArea(contours[i]);
+
+		// Remove small objects by drawing the contour with black color
+		if (area >= 0 && area <= size)
+			cv::drawContours(im, contours, i, CV_RGB(0, 0, 0), -1);
+	}
 }
 
 int fit_upper_eyelid( Mat& img, Point iris_center, int iris_rds, Point pupil_center, int pupil_rds, double* range, double offset, bool save_image, Mat& coffs)
@@ -1593,29 +1722,41 @@ int fit_upper_eyelid( Mat& img, Point iris_center, int iris_rds, Point pupil_cen
 	int cols = img.cols;
 
 	Mat struct_map(img.size(),CV_8UC1);
+	Mat iris_mask(img.size(),CV_8UC1);
+
+	GaussianBlur(img,img,Size(7,7),0);
+	GaussianBlur(img,img,Size(7,7),0);
+
+	iris_preprecessing(img, pupil_center, pupil_rds,iris_mask);
+
+	double thresh = 15;
+	soble_double_direction(img,iris_mask,thresh,struct_map);
+
+	removeSmallBlobs(struct_map,10);	
+
 	//soble_double_direction(img,struct_map);
-	Canny(img,struct_map,50,60);
+	//Canny(img,struct_map,50,60);
 
-	Mat dymap = Mat::zeros(img.size(),CV_8UC1);
+//	Mat dymap = Mat::zeros(img.size(),CV_8UC1);
 
-	for (int i = 0; i < rows-1; i++)
-	{
-		for (int j = 0; j < cols; j++)
-		{
-			dymap.ptr<unsigned char>(i)[j] = img.ptr<unsigned char>(i)[j] - img.ptr<unsigned char>(i+1)[j];
-		}
-	}
+	//for (int i = 0; i < rows-1; i++)
+	//{
+	//	for (int j = 0; j < cols; j++)
+	//	{
+	//		dymap.ptr<unsigned char>(i)[j] = img.ptr<unsigned char>(i)[j] - img.ptr<unsigned char>(i+1)[j];
+	//	}
+	//}
 
-	for (int i = 0; i < rows; i++)
-	{
-		for (int j = 0; j < cols; j++)
-		{
-			if (dymap.ptr<unsigned char>(i)[j] <= 0)
-			{
-				struct_map.ptr<unsigned char>(i)[j] = 0;
-			}		
-		}
-	}
+	//for (int i = 0; i < rows; i++)
+	//{
+	//	for (int j = 0; j < cols; j++)
+	//	{
+	//		if (dymap.ptr<unsigned char>(i)[j] <= 0)
+	//		{
+	//			struct_map.ptr<unsigned char>(i)[j] = 0;
+	//		}		
+	//	}
+	//}
 
 	Mat dis(img.size(),CV_32FC1);
 	//iris_center.y = iris_center.y - 4;
@@ -1638,12 +1779,15 @@ int fit_upper_eyelid( Mat& img, Point iris_center, int iris_rds, Point pupil_cen
 	{
 		for (int j = 0; j < cols; j++)
 		{
-			dis.ptr<float>(i)[j] = sqrt((j-pupil_center.x)*(j-pupil_center.x)+(i-pupil_center.y)*(i-pupil_center.y)) - pupil_rds;
-			pupil.ptr<unsigned char>(i)[j] = (abs(dis.ptr<float>(i)[j]) < 4)?255:0;
+			dis.ptr<float>(i)[j] = sqrt((j-iris_center.x)*(j-iris_center.x)+(i-iris_center.y)*(i-iris_center.y)) - iris_rds;
+			//pupil.ptr<unsigned char>(i)[j] = (abs(dis.ptr<float>(i)[j]) < 4)?255:0;
+
+			if (abs(dis.ptr<float>(i)[j]) < 4 || i > iris_center.y + iris_rds || i < iris_center.y-iris_rds || j < iris_center.x - iris_rds || j > iris_center.x + iris_rds)
+			{
+				struct_map.ptr<unsigned char>(i)[j] = 0;
+			}
 		}
 	}
-
-	
 
 	Mat upper_rect(img.size(),CV_8UC1);
 
@@ -1985,10 +2129,69 @@ int eyelash_pixels_location(Mat& src, Point iris_center, int iris_rds, Point pup
 	return 0;
 }
 
+int iris_preprecessing(Mat src, Point pupil_center, int pupil_rds,Mat& iris_mask)
+{
+	int i, j;
+
+	iris_mask = Mat::zeros(src.size(),CV_8UC1);
+	Vector<Point> IR_points;
+
+	for(i = pupil_center.y; i < pupil_center.y + 1.5*pupil_rds; i++)
+		for(j = pupil_center.x - 1.5*pupil_rds; j < pupil_center.x + 1.5*pupil_rds; j++)
+		{
+			//double dist_to_iris = sqrt(((double)i-iris_center.y)*(i-iris_center.y)+(j-iris_center.x)*(j-iris_center.x));
+			double dist_to_pupil = ((double)i-pupil_center.y)*(i-pupil_center.y)+(j-pupil_center.x)*(j-pupil_center.x);
+			if(dist_to_pupil > pupil_rds*pupil_rds && src.ptr<unsigned char>(i)[j] < 200)
+			{
+				IR_points.push_back(cv::Point(j,i));
+			}
+		}
+
+	if (IR_points.size() == 0)
+	{
+		return -1;
+	}
+
+	float sum=0,s=0,mean,stand;
+	for(i = 0; i < IR_points.size(); i++)
+	{
+		sum += src.data[IR_points[i].y*src.cols+IR_points[i].x];
+	}
+	mean = sum/IR_points.size();
+
+	for(i=0;i<IR_points.size();i++)
+	{
+		s += (src.data[IR_points[i].y*src.cols+IR_points[i].x] - mean)*(src.data[IR_points[i].y*src.cols+IR_points[i].x] - mean);
+	}
+
+	stand = sqrt(s/IR_points.size());
+
+	int T_low = mean - 3.5*stand;
+	int T_high = mean + 2.5*stand;
+
+	cout<<"T_low = "<<T_low<<endl;
+	cout<<"T_high = "<<T_high<<endl;
+
+	for ( i = 0; i < src.rows; i++)
+	{
+		for(j = 0; j < src.cols; j++)
+		{
+			if (src.ptr<unsigned char>(i)[j] < T_low || src.ptr<unsigned char>(i)[j] > T_high)
+			{
+					
+				iris_mask.ptr<unsigned char>(i)[j] = 255;
+			}
+		}
+	}		
+
+	return 0;
+}
+
 int get_rtv_l1_contour(Mat img, Mat& edgemap, Mat& im_smooth)
 {
 	rtv_l1_smooth2(img,0.02,0.15,3,0.01,5,im_smooth);
-	soble_double_direction(im_smooth,edgemap);
+	Mat mask = Mat::zeros(img.size(),CV_8UC1);
+	soble_double_direction(im_smooth,mask,10,edgemap);
 
 	int rows = img.rows;
 	int cols = img.cols;
@@ -2220,6 +2423,7 @@ int computeU(Mat& u, Mat v, Mat f,double lambda,double theta, double sigma, doub
 	add(n,tmp,tmp);
 
 	Mat tmp_one = Mat::ones(tmp.size(),CV_32FC1);
+	cout<<"666"<<endl;
 
 	subtract(tmp_one,tmp,D);
 
@@ -2229,6 +2433,8 @@ int computeU(Mat& u, Mat v, Mat f,double lambda,double theta, double sigma, doub
 	{
 		tmp_diags.ptr<float>(i)[i] = D.ptr<float>(i)[0];
 	}
+
+	cout<<"777"<<endl;
 
 	Mat trans_A;
 	transpose(A,trans_A);
@@ -2249,7 +2455,9 @@ int computeU(Mat& u, Mat v, Mat f,double lambda,double theta, double sigma, doub
 	}
 	Mat tout;
 
+	cout<<"777"<<endl;
 	solve(A,tin_col,tout,DECOMP_CHOLESKY);
+	cout<<"999"<<endl;
 
 	for (int i = 0; i < u.cols; i++)
 	{
@@ -2258,7 +2466,7 @@ int computeU(Mat& u, Mat v, Mat f,double lambda,double theta, double sigma, doub
 			u.ptr<float>(j)[i] = tout.ptr<float>(j*u.cols+i)[0];
 		}
 	}
-	
+	cout<<"888"<<endl;
 	return 0;
 }
 

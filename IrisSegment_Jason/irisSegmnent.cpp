@@ -22,7 +22,8 @@ void cal_canny_high_thresd(Mat src, float ratio, int& high_thresd);
 
 void main()
 {
-	Mat img = imread("C:\\Users\\hkpuadmin\\Desktop\\eyeImages\\009.jpg",1);
+	Mat img = imread("F:\\nir_face\\Fine images\\eyeImages\\015.jpg",1);
+	//Mat img = imread("C:\\Users\\pebble\\Desktop\\66_Jun_Liu_iris_15_04_22_04_49_49.jpg",1);
 
 	int rows = img.rows;
 	int cols = img.cols;
@@ -33,62 +34,6 @@ void main()
  	{
  		cvtColor(img,img,CV_BGR2GRAY);
  	}
-
-	//Point pupil_center(0,0);
-	//int pupil_rds = 0;
-	//
-	//int ret = 0;
-
-	//GaussianBlur(img, img, Size(5,5), 0 , 0);
-
-	//int i,j;
-
-	///*****if eye image is too large, downsample eye image. the scale (times) is image's cols/200 *****/
-	//int times = img.cols/200;
-	//if(times == 0)
-	//{
-	//	times = 1;
-	//}
-
-	//double pupil_radius_range[2] = {20,60};
-
-	///*****downsample eye image *****/
-	//int iMinR = pupil_radius_range[0]/times, iMaxR = pupil_radius_range[1]/times;
-
-	//Mat src_cut = Mat::zeros((img.rows-img.rows%times),(img.cols-img.cols%times),CV_8UC1);
-	//for(i = 0; i < src_cut.rows; i++)
-	//	for(j = 0; j < src_cut.cols; j++)
-	//	{
-	//		src_cut.at<unsigned char>(i,j) = img.at<unsigned char>(i,j);
-	//		//src_cut.data[i*src_cut.cols + j] = iris_img.data[i*iris_img.cols + j];
-	//	}
-
-	//Mat src_small = Mat::zeros(src_cut.rows/times,src_cut.cols/times, CV_8UC1);
-
-	//for(i = 0; i< src_small.rows; i++)
-	//	for(j = 0; j < src_small.cols; j++)
-	//	{
-	//		src_small.data[i*src_small.cols + j] = src_cut.data[i*times*src_cut.cols +j*times];
-	//	}
-
-	//GaussianBlur(src_small, src_small, Size(5,5), 0 , 0);
-
-	//pupil_coarse_location(src_small, iMinR, iMaxR, pupil_center, pupil_rds);
-
-	//Point dst_pupil_center;
-	//dst_pupil_center.x = pupil_center.x * times;
-	//dst_pupil_center.y = pupil_center.y * times;
-	//int dst_pupil_rds = pupil_rds * times;
-	//circle(img,dst_pupil_center,dst_pupil_rds,cv::Scalar(255));
-
-	//cout<<"dst_pupil_center = "<<dst_pupil_center<<endl;
-	//cout<<"dst_pupil_rds = "<<dst_pupil_rds<<endl;
-
-	//cvNamedWindow( "better_result", 1 );
-	//imshow("better_result", img);
-	//cvWaitKey(0);
-	//cvDestroyWindow( "better_result" );
-
 	
 	time_t cur_time, last_time;
 	last_time = clock();
@@ -134,18 +79,18 @@ void main()
 
 	GaussianBlur(img_enhanced,img_enhanced,Size(7,7),0);
 
-	Mat img_smooth, edgemap;
-	get_rtv_l1_contour(img_enhanced,edgemap,img_smooth);
+	//Mat img_smooth, edgemap;
+	//get_rtv_l1_contour(img_enhanced,edgemap,img_smooth);
 
-	cvNamedWindow( "better_result", 1 );
-	cvNamedWindow( "img", 1 );
-	imshow("better_result", img_smooth);
-	imshow("img", edgemap);
-	cvWaitKey(0);
-	cvDestroyWindow( "better_result" );
-	cvDestroyWindow( "img" );
+	//cvNamedWindow( "better_result", 1 );
+	//cvNamedWindow( "img", 1 );
+	//imshow("better_result", img_smooth);
+	//imshow("img", edgemap);
+	//cvWaitKey(0);
+	//cvDestroyWindow( "better_result" );
+	//cvDestroyWindow( "img" );
 
-	return;
+	//return;
 
 	int canny_h_thresd = 0;
 	cal_canny_high_thresd(img_enhanced,0.3,canny_h_thresd);
@@ -153,7 +98,7 @@ void main()
 	int canny_l_threshold = canny_h_thresd*0.5;
 
 	Mat canny_ret_img;
-	Canny( img_enhanced, canny_ret_img, canny_l_threshold, canny_h_thresd);
+	Canny(img_enhanced, canny_ret_img, canny_l_threshold, canny_h_thresd);
 //	Canny( img_enhanced, canny_ret_img, 50, 70);
 
 	for(int i = 0; i < img_enhanced.rows; i++)
@@ -215,140 +160,116 @@ void main()
 	
 	Rect iris_area(left_top,right_bottom);
 	Mat iris_img = img_enhanced(iris_area).clone();
-
-	//Point left_top((pupil_center.x - 1.2*pupil_rds + cols/4),(pupil_center.y - 1.2*pupil_rds + rows/4));
-	//Point right_bottom((pupil_center.x + 1.2*pupil_rds + cols/4),(pupil_center.y + 1.2*pupil_rds + rows/4));
-	//Rect iris_area(left_top,right_bottom);
-	//Mat iris_img = img(iris_area).clone();
-
-	calc_threshold(iris_img,0,0.7,low_threshold,high_threshold);
-
-	cout<<"333"<<endl;
-
-	threshold(iris_img,bw_img,high_threshold,255,0);
-
-	//bw_big = bw_img.clone();
-
-	//removeSmallBlobs(bw_big,1000);
-
-	//for(int i = 0; i < bw_img.rows; i++)
-	//	for(int j = 0; j < bw_img.cols; j++)
-	//	{
-	//		if (bw_big.at<unsigned char>(i,j) != 0)
-	//		{
-	//			bw_img.at<unsigned char>(i,j) = 0;
-	//		}
-	//	}
-
-	//cvNamedWindow( "better_result", 1 );
-	//imshow("better_result", bw_img);
-	//cvWaitKey(0);
-	//cvDestroyWindow( "better_result" );
-
-	element = getStructuringElement( MORPH_ELLIPSE, Size(dilation_size,dilation_size));
-
-  /// Apply the dilation operation
-	dilate( bw_img, dil_img, element );
-	
-
-	//cvNamedWindow( "better_result", 1 );
-	//imshow("better_result", iris_img);
-	//cvWaitKey(0);
-	//cvDestroyWindow( "better_result" );
-
-	//cout<<"iris_center = "<<iris_center<<endl;
-	equalizeHist(iris_img,iris_img);
+	Mat iris_mask;
 
 	GaussianBlur(iris_img,iris_img,Size(7,7),0);
 	GaussianBlur(iris_img,iris_img,Size(7,7),0);
-	cout<<"222"<<endl;
 
-	cal_canny_high_thresd(iris_img,0.15,canny_h_thresd);
+	iris_preprecessing(iris_img, Point(iris_area.width/2,iris_area.height/2), pupil_rds,iris_mask);
 
-	canny_l_threshold = canny_h_thresd*0.5;
+	double thresh = 15;
 	Mat new_canny_result;
-	Canny( iris_img, new_canny_result, canny_l_threshold, canny_h_thresd);
+	soble_double_direction(iris_img,iris_mask,thresh,new_canny_result);
 
-	for(int i = 0; i < iris_img.rows; i++)
-		for(int j = 0; j < iris_img.cols; j++)
-		{
-			int distance = (i-pupil_center.y)*(i-pupil_center.y) + (j - pupil_center.x)*(j - pupil_center.x);
-			if (abs(distance-pupil_rds*pupil_rds) < 0.5*0.5*pupil_rds*pupil_rds)
-			{
-				new_canny_result.at<unsigned char>(i,j) = 0;
-			}
-		}
+	removeSmallBlobs(new_canny_result,10);	
 
-	for(int i = 0; i < iris_img.rows; i++)
-		for(int j = 0; j < iris_img.cols; j++)
-		{
-			if (dil_img.ptr<unsigned char>(i)[j] != 0)
-			{
-				new_canny_result.ptr<unsigned char>(i)[j] = 0;
-			}
-		}
+//	thin2(new_canny_result,new_canny_result);
 
 	//cvNamedWindow( "better_result", 1 );
 	//imshow("better_result", new_canny_result);
 	//cvWaitKey(0);
 	//cvDestroyWindow( "better_result" );
 
-	int irisRange[2] = {(int)pupil_rds*1.5, (int)pupil_rds*6};
-	find_radius(new_canny_result,center_point, irisRange, searchRange,iris_center,iris_rds);
 
-	cout<<"iris_center = "<<iris_center<<endl;
-	cout<<"iris_rds = "<<iris_rds<<endl;
+	//Point left_top((pupil_center.x - 1.2*pupil_rds + cols/4),(pupil_center.y - 1.2*pupil_rds + rows/4));
+	//Point right_bottom((pupil_center.x + 1.2*pupil_rds + cols/4),(pupil_center.y + 1.2*pupil_rds + rows/4));
+	//Rect iris_area(left_top,right_bottom);
+	//Mat iris_img = img(iris_area).clone();
 
-	//cout<<"After find_radius"<<endl;
-	//circle(img,iris_center,iris_rds,cv::Scalar(255));
+	//calc_threshold(iris_img,0,0.7,low_threshold,high_threshold);
+
+	//cout<<"333"<<endl;
+
+	//threshold(iris_img,bw_img,high_threshold,255,0);
+
+	////bw_big = bw_img.clone();
+
+	////removeSmallBlobs(bw_big,1000);
+
+	////for(int i = 0; i < bw_img.rows; i++)
+	////	for(int j = 0; j < bw_img.cols; j++)
+	////	{
+	////		if (bw_big.at<unsigned char>(i,j) != 0)
+	////		{
+	////			bw_img.at<unsigned char>(i,j) = 0;
+	////		}
+	////	}
+
+	//
+
+	//element = getStructuringElement( MORPH_ELLIPSE, Size(dilation_size,dilation_size));
+
+ // /// Apply the dilation operation
+	//dilate( bw_img, dil_img, element );
+	//
+
+	////cvNamedWindow( "better_result", 1 );
+	////imshow("better_result", iris_img);
+	////cvWaitKey(0);
+	////cvDestroyWindow( "better_result" );
+
+	////cout<<"iris_center = "<<iris_center<<endl;
+	//equalizeHist(iris_img,iris_img);
+
+	//GaussianBlur(iris_img,iris_img,Size(7,7),0);
+	//GaussianBlur(iris_img,iris_img,Size(7,7),0);
+	//cout<<"222"<<endl;
+
+	//cal_canny_high_thresd(iris_img,0.15,canny_h_thresd);
+
+	//canny_l_threshold = canny_h_thresd*0.5;
+	//Mat new_canny_result;
+	//Canny( iris_img, new_canny_result, canny_l_threshold, canny_h_thresd);
+
+	//for(int i = 0; i < iris_img.rows; i++)
+	//	for(int j = 0; j < iris_img.cols; j++)
+	//	{
+	//		int distance = (i-pupil_center.y)*(i-pupil_center.y) + (j - pupil_center.x)*(j - pupil_center.x);
+	//		if (abs(distance-pupil_rds*pupil_rds) < 0.5*0.5*pupil_rds*pupil_rds)
+	//		{
+	//			new_canny_result.at<unsigned char>(i,j) = 0;
+	//		}
+	//	}
+
+	//for(int i = 0; i < iris_img.rows; i++)
+	//	for(int j = 0; j < iris_img.cols; j++)
+	//	{
+	//		if (dil_img.ptr<unsigned char>(i)[j] != 0)
+	//		{
+	//			new_canny_result.ptr<unsigned char>(i)[j] = 0;
+	//		}
+	//	}
 
 	//cvNamedWindow( "better_result", 1 );
-	//imshow("better_result", img);
+	//imshow("better_result", new_canny_result);
 	//cvWaitKey(0);
 	//cvDestroyWindow( "better_result" );
 
-	//Mat canny_show = canny_ret_img.clone();
+	Point new_pupil_center(pupil_center.x-iris_area.x,pupil_center.y-iris_area.y);
 
-	//int pupil_radius_range[2] = {radiusRange[0]*0.1,radiusRange[1]*0.7};
-	
-	//
-	//int ret = 0;
+	int irisRange[2] = {(int)pupil_rds*1.5, (int)pupil_rds*7};
+	find_iris_radius(new_canny_result,new_pupil_center, irisRange, searchRange,iris_center,iris_rds);
 
-	//GaussianBlur(iris_img, iris_img, Size(5,5), 0 , 0);
+	//circle(new_canny_result,iris_center,iris_rds,cv::Scalar(255));
 
-	//int i,j;
+	//cvNamedWindow( "better_result", 1 );
+	//imshow("better_result", new_canny_result);
+	//cvWaitKey(0);
+	//cvDestroyWindow( "better_result" );
 
-	///*****if eye image is too large, downsample eye image. the scale (times) is image's cols/200 *****/
-	//int times = iris_img.cols/200;
-	//if(times == 0)
-	//{
-	//	times = 1;
-	//}
-
-	///*****downsample eye image *****/
-	//int iMinR = pupil_radius_range[0]/times, iMaxR = pupil_radius_range[1]/times;
-
-	//Mat src_cut = Mat::zeros((iris_img.rows-iris_img.rows%times),(iris_img.cols-iris_img.cols%times),CV_8UC1);
-	//for(i = 0; i < src_cut.rows; i++)
-	//	for(j = 0; j < src_cut.cols; j++)
-	//	{
-	//		src_cut.at<unsigned char>(i,j) = iris_img.at<unsigned char>(i,j);
-	//		//src_cut.data[i*src_cut.cols + j] = iris_img.data[i*iris_img.cols + j];
-	//	}
-
-	//Mat src_small = Mat::zeros(src_cut.rows/times,src_cut.cols/times, CV_8UC1);
-
-	//for(i = 0; i< src_small.rows; i++)
-	//	for(j = 0; j < src_small.cols; j++)
-	//	{
-	//		src_small.data[i*src_small.cols + j] = src_cut.data[i*times*src_cut.cols +j*times];
-	//	}
-
-	//GaussianBlur(src_small, src_small, Size(5,5), 0 , 0);
-
-	//pupil_coarse_location(src_small, iMinR, iMaxR, pupil_center, pupil_rds);
-	//find_pupil_radius(canny_ret_img,Point(canny_ret_img.rows/2,canny_ret_img.cols/2), pupil_radius_range, 5, pupil_center, pupil_rds);
-	 
+	cout<<"iris_center = "<<iris_center<<endl;
+	cout<<"iris_rds = "<<iris_rds<<endl;
+ 
 	cur_time = clock();
 	time_cost = cur_time - last_time;
 	cout<<"  pupil location time_cost = "<<time_cost<<endl;
@@ -358,12 +279,14 @@ void main()
 	//cur_time = clock();
 	//time_cost = cur_time - last_time;
 
-	Point rst_iris_center = iris_center, rst_pupil_center((pupil_center.x),(pupil_center.y));
+	Point rst_iris_center(iris_center.x+iris_area.x,iris_center.y+iris_area.y), rst_pupil_center((pupil_center.x),(pupil_center.y));
 	int rst_iris_rds = iris_rds;
 	int rst_pupil_rds = pupil_rds;
 
 	circle(img,rst_iris_center,rst_iris_rds,cv::Scalar(255));
 	circle(img,rst_pupil_center,rst_pupil_rds,cv::Scalar(255));
+
+	
 
 	//cvNamedWindow( "better_result", 1 );
 	//imshow("better_result", img);
@@ -381,7 +304,7 @@ void main()
 	cout<<"  lower eyelid location time_cost = "<<time_cost<<endl;
 	last_time = clock();
 
-	fit_upper_eyelid(img_enhanced,rst_iris_center,rst_iris_rds,rst_pupil_center,rst_pupil_rds,range,15,false,coffs_upper);
+	fit_upper_eyelid(img_enhanced,rst_iris_center,rst_iris_rds,rst_pupil_center,rst_pupil_rds,range,345,false,coffs_upper);
 
 	cur_time = clock();
 	time_cost = cur_time - last_time;
@@ -407,7 +330,7 @@ void main()
 	//process_ES_region(img_enhanced, mask, rst_iris_center, rst_iris_rds, coffs_upper, thresh);
 
 	Vector<cv::Point> eyelash_points;
-	eyelash_pixels_location(img_enhanced,iris_center,iris_rds,pupil_center,pupil_rds,eyelash_points);
+	eyelash_pixels_location(img_enhanced,rst_iris_center,rst_iris_rds,pupil_center,pupil_rds,eyelash_points);
 	mask.setTo(0);
 
 	cur_time = clock();
@@ -424,12 +347,12 @@ void main()
 	//mask_lower_region(img_enhanced,iris_center,iris_rds,extend,mask,thresh_high,thresh_low,cir_correct);
 
 	//imwrite("mask.bmp",mask);
-	//imwrite("final_result.bmp",img);
+	imwrite("F:\\nir_face\\Fine images\\eyeImages\\final_result.bmp",img);
 
 	cvNamedWindow( "better_result", 1 );
 	cvNamedWindow( "img", 1 );
 	imshow("better_result", img);
-	imshow("img", mask);
+	imshow("img", new_canny_result);
 	cvWaitKey(0);
 	cvDestroyWindow( "better_result" );
 	cvDestroyWindow( "img" );
@@ -437,26 +360,7 @@ void main()
 //	getchar();
 }
 
-void removeSmallBlobs(cv::Mat& im, double size)
-{
-	// Only accept CV_8UC1
-	if (im.channels() != 1 || im.type() != CV_8U)
-		return;
 
-	// Find all contours
-	std::vector<std::vector<cv::Point> > contours;
-	cv::findContours(im.clone(), contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
-
-	for (int i = 0; i < contours.size(); i++)
-	{
-		// Calculate contour area
-		double area = cv::contourArea(contours[i]);
-
-		// Remove small objects by drawing the contour with black color
-		if (area >= 0 && area <= size)
-			cv::drawContours(im, contours, i, CV_RGB(0, 0, 0), -1);
-	}
-}
 
 void cal_canny_high_thresd(Mat src, float ratio, int& high_thresd)
 {

@@ -41,6 +41,8 @@ void findCenter(Mat edgemap, int* radiusRange, int points_gap, Point &center_poi
 
 void find_radius(Mat edgemap, Point center_point, int* radiusRange, int searchRange, Point& output_center, int& output_radius);
 
+void find_iris_radius(Mat edgemap, Point center_point, int* radiusRange, int searchRange, Point& output_center, int& output_radius);
+
 void find_pupil_radius(Mat edgemap, Point center_point, int* radiusRange, int searchRange, Point& output_center, int& output_radius);
 
 void mask_lower_region(Mat img, Point center, int radius, double* extend, Mat& mask, double* thresh_high, double* thresh_low, double& cir_correct);
@@ -63,11 +65,15 @@ int fit_lower_eyelid( Mat img, Point iris_center, int iris_rds, Point pupil_cent
 
 int fit_upper_eyelid( Mat& img, Point iris_center, int iris_rds, Point pupil_center, int pupil_rds, double* range, double offset, bool save_image, Mat& coffs);
 
+void removeSmallBlobs(cv::Mat& im, double size);
+
 int process_ES_region( Mat img, Mat& mask, Point center, int rds, Mat& coffs, double* thresh);
 
-void soble_double_direction(Mat img, Mat& result);
+void soble_double_direction(Mat img, Mat mask, double thresh, Mat& result);
 
 int eyelash_pixels_location(Mat& src, Point iris_center, int iris_rds, Point pupil_center, int pupil_rds, Vector<cv::Point>& eyelash_points);
+
+int iris_preprecessing(Mat src, Point pupil_center, int pupil_rds,Mat& iris_mask);
 
 int get_rtv_l1_contour(Mat img, Mat& edgemap, Mat& im_smooth);
 
