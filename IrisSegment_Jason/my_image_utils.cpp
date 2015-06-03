@@ -658,16 +658,20 @@ int interp2(Mat src, double* xo, double* yo, int width, int height, Mat& dst)
 	return 0;
 }
 
-void findCenter(Mat edgemap, int* radiusRange, int points_gap, Point &center_point)
+int findCenter(Mat edgemap, int* radiusRange, int points_gap, Point &center_point)
 {
 	vector<vector<Point> > contours;
 	findContours(edgemap, contours, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
 
 	int num_of_lines = contours.size();
+	if (num_of_lines == 0)
+	{
+		return -1;
+	}
 
 	Mat votes_left = Mat::ones(edgemap.rows, edgemap.cols, CV_8UC1);
 	Mat votes_right = Mat::ones(edgemap.rows, edgemap.cols, CV_8UC1);
-	Mat mark_mat = Mat::zeros(edgemap.rows, edgemap.cols, CV_8SC1);
+	Mat mark_mat = Mat::zeros(edgemap.rows, edgemap.cols, CV_8UC1);
 
 	for (int i = 0; i < num_of_lines; i++)
 	{
@@ -764,91 +768,49 @@ void findCenter(Mat edgemap, int* radiusRange, int points_gap, Point &center_poi
 	blur(votes_left, votes_left, cv::Size(3,3));
 	blur(votes_right, votes_right, cv::Size(3,3));
 
-	Mat votes = Mat::zeros(votes_left.size(),CV_32FC1);
+	Mat votes = Mat::zeros(votes_left.size(),CV_8UC1);
+
 	int max_value = 0;
-	//Point max_position(0,0);
+
 	for (int i = 0; i < votes.rows; i++)
 	{
 		for (int j = 0; j < votes.cols; j++)
 		{
-			votes.ptr<float>(i)[j] = votes_left.ptr<unsigned char>(i)[j]*votes_right.ptr<unsigned char>(i)[j] - 1;
+			votes.ptr<unsigned char>(i)[j] = (votes_left.ptr<unsigned char>(i)[j]*votes_right.ptr<unsigned char>(i)[j] - 1);
 			
-			if (max_value < votes.ptr<float>(i)[j])
+			if (max_value < votes.ptr<unsigned char>(i)[j])
 			{
-				max_value = votes.ptr<float>(i)[j];
+				max_value = votes.ptr<unsigned char>(i)[j];
 				center_point.x = j;
 				center_point.y = i;
 			}
 		}
 	}
-
-	//cvNamedWindow( "better_result", 1 );
-	//imshow("better_result", votes);
-	//cvWaitKey(0);
-	//cvDestroyWindow( "better_result" );
-
-	//for (int i = 0; i < votes.rows; i++)
-	//{
-	//	for (int j = 0; j < votes.cols; j++)
-	//	{
-	//		votes.at<unsigned char>(i,j) = votes.at<unsigned char>(i,j)/max_value;
-	//	}
-	//}
-
-	//Mat imvotes = votes.clone();
-
-	//for(int i = 0; i < imvotes.rows; i++)
-	//	for(int j = 0; j < imvotes.cols; j++)
-	//	{
-	//		if (edgemap.at<unsigned char>(i,j) != 0)
-	//		{
-	//			imvotes.at<unsigned char>(i,j) = 255;
-	//		}
-	//	}
-
-	//if (max_position.x > 3 && max_position.y > 3)
-	//{
-	//	for (int i = -3; i < 4; i++)
-	//	{
-	//		for (int j = -3; j < 4; j++)
-	//		{
-	//			imvotes.at<unsigned char>(max_position.y+i,max_position.x+j) = 255;
-	//		}
-	//	}
-	//}
-	
-
-	//cout<<"max_position.x = "<<max_position.x<<endl;
-	//cout<<"max_position.y = "<<max_position.y<<endl;
+	return 0;
 }
 
-void find_radius(Mat edgemap, Point center_point, int* radiusRange, int searchRange, Point& output_center, int& output_radius)
+int find_pupil_radius(Mat edgemap, Point center_point, int* radiusRange, int searchRange, Point& output_center, int& output_radius)
 {
-	//int upper_bound = 1>(center_point.y - searchRange - 2)?1:(center_point.y - searchRange - 2);
-	//for (int i = 0; i < upper_bound; i++)
-	//{
-	//	for (int j = 0; j < edgemap.cols; j++)
-	//	{
-	//		edgemap.ptr<unsigned char>(i)[j] = 0;
-	//	}		
-	//}
+	Point left_top_point(0,0), right_bottom_point(0,0);
+	left_top_point.x = (center_point.x - radiusRange[1] - searchRange)<1?1:(center_point.x - radiusRange[1] - searchRange);
+	left_top_point.y = (center_point.y - radiusRange[1] - searchRange)<1?1:(center_point.y - radiusRange[1] - searchRange);
+	right_bottom_point.x = (center_point.x + radiusRange[1] + searchRange) > edgemap.cols-1?edgemap.cols -1:(center_point.x + radiusRange[1] + searchRange);
+	right_bottom_point.y = (center_point.y + radiusRange[1] + searchRange) > edgemap.rows-1?edgemap.rows -1:(center_point.y + radiusRange[1] + searchRange);
+	
+	Mat pupil_area_edgemap = edgemap(Rect(left_top_point,right_bottom_point));
 
-	//cvNamedWindow( "better_result", 1 );
-	//imshow("better_result", edgemap);
-	//cvWaitKey(0);
-	//cvDestroyWindow( "better_result" );
+	Point new_center_point(center_point.x - left_top_point.x, center_point.y - left_top_point.y);
 
-	Point center_output(0,0);
-	int rds_outpoint = 0;
+	Point new_center_output(0,0);
 	int grade = 0;
 
 	vector<int> X, Y;
 
-	for (int i = 0; i < edgemap.rows; i++)
+	for (int i = 0; i < pupil_area_edgemap.rows; i++)
 	{
-		for (int j = 0; j < edgemap.cols; j++)
+		for (int j = 0; j < pupil_area_edgemap.cols; j++)
 		{
-			if (edgemap.ptr<unsigned char>(i)[j] != 0)
+			if (pupil_area_edgemap.ptr<unsigned char>(i)[j] != 0)
 			{
 				Y.push_back(i);
 				X.push_back(j);
@@ -858,93 +820,83 @@ void find_radius(Mat edgemap, Point center_point, int* radiusRange, int searchRa
 
 	int num = X.size();
 
-	cout<<"num = "<<num<<endl;
+	Mat r = Mat::zeros(num,1,CV_16UC1);
 
-	int* r = new int[num];
-	memset(r,0,sizeof(int)*num);
+	int len = radiusRange[1] - radiusRange[0] + searchRange;
 
-	int len = radiusRange[1] - radiusRange[0] + 3;
-	int* x_axis = new int[1000];
-	int* y_axis = new int[1000];
+	Mat y_axis = Mat::zeros(len,1,CV_16UC1);
 
-	memset(x_axis,0,sizeof(int)*1000);			
-	memset(y_axis,0,sizeof(int)*1000);
-
-	for (int i = center_point.x - searchRange; i < center_point.x + searchRange; i++)
+	for (int i = new_center_point.x - searchRange; i < new_center_point.x + searchRange; i++)
 	{
-		for (int j = center_point.y - searchRange; j < center_point.y + searchRange; j++)
+		for (int j = new_center_point.y - searchRange; j < new_center_point.y + searchRange; j++)
 		{
-			//memset(r,0,sizeof(int)*num);
+			y_axis.setTo(0);
+
 			for (int k = 0; k < num; k++)
 			{
-				r[k] = sqrt((i-(float)X[k])*(i-(float)X[k]) + (j-(float)Y[k])*(j-(float)Y[k]));
-				//int index = (r[k] - radiusRange[0]) >= 0?(r[k] - radiusRange[0]):0;
-				//index = (index<radiusRange[1])?index:(radiusRange[1]-1);
-				//y_axis[index]++;
+				r.ptr<int>(k)[0] = sqrt((i-(float)X[k])*(i-(float)X[k]) + (j-(float)Y[k])*(j-(float)Y[k]));
+				int idex = (r.ptr<int>(k)[0] - radiusRange[0] + 1)>(len-1)?(len-1):(r.ptr<int>(k)[0] - radiusRange[0] + 1);
+				idex = idex < 0?0:idex;
+				y_axis.ptr<int>(idex)[0]++;
 			}
-		
-			memset(x_axis,0,sizeof(int)*1000);			
-			memset(y_axis,0,sizeof(int)*1000);
-			//float gap = (((float)radiusRange[1] - radiusRange[0] + 2)/(len-1)) == 0?INF:(((float)radiusRange[1] - radiusRange[0] + 2)/(len-1));
-			float gap = 1;
-			x_axis[0] = radiusRange[0] - 1;
-			x_axis[len-1] = radiusRange[1] + 1;
-			for(int m = 1; m < len-1; m++)
-			{
-				x_axis[m] = x_axis[m-1] + gap;
-			}
-			for (int m = 0; m < num; m++)
-			{
-				int idex = (((int)r[m] - (int)x_axis[0])/gap)>(len-1)?(len-1):(((int)r[m] - (int)x_axis[0])/gap);
-				y_axis[idex]++;
-			}
-			y_axis[0] = 0;
-			y_axis[len-1] = 0;
+	
+			y_axis.ptr<int>(0)[0] = 0;
+			y_axis.ptr<int>(len-1)[0] = 0;
 
 			int grade_cur = 0;
 			int index = 0;
 			for (int m = 1; m < len-1; m++)
 			{
-				y_axis[m] = (y_axis[m] + y_axis[m-1] + y_axis[m+1])/3;
-				if (grade_cur < y_axis[m])
+				y_axis.ptr<int>(m)[0] = (y_axis.ptr<int>(m)[0] + y_axis.ptr<int>(m-1)[0] + y_axis.ptr<int>(m+1)[0])/3;
+				if (grade_cur < y_axis.ptr<int>(m)[0])
 				{
-					grade_cur = y_axis[m];
+					grade_cur = y_axis.ptr<int>(m)[0];
 					index = m;
 				}
 			}
  			if (grade_cur > grade)
 			{
-				output_radius = radiusRange[0] + index -2;
-				output_center.x = i;
-				output_center.y = j;
+				output_radius = radiusRange[0] + index - 1;
+				new_center_output.x = i;
+				new_center_output.y = j;
 				grade = grade_cur;
 			}
 		}
 	}
-	cout<<"3"<<endl;
-	//delete[] r;
-	//delete[] x_axis;
-	//delete[] y_axis;
+
+	output_center.x = new_center_output.x + left_top_point.x;
+	output_center.y = new_center_output.y + left_top_point.y;
+
+	return 0;
 }
 
-void find_iris_radius(Mat edgemap, Point center_point, int* radiusRange, int searchRange, Point& output_center, int& output_radius)
+int find_iris_radius(Mat edgemap, Point center_point, int* radiusRange, int searchRange, Point& output_center, int& output_radius)
 {
-	//cvNamedWindow( "better_result", 1 );
-	//imshow("better_result", edgemap);
-	//cvWaitKey(0);
-	//cvDestroyWindow( "better_result" );
+	Point left_top_point(0,0), right_bottom_point(0,0);
+	left_top_point.x = (center_point.x - radiusRange[1] - searchRange)<1?1:(center_point.x - radiusRange[1] - searchRange);
+	left_top_point.y = (center_point.y - radiusRange[1] - searchRange)<1?1:(center_point.y - radiusRange[1] - searchRange);
+	right_bottom_point.x = (center_point.x + radiusRange[1] + searchRange) > edgemap.cols-1?edgemap.cols -1:(center_point.x + radiusRange[1] + searchRange);
+	right_bottom_point.y = (center_point.y + radiusRange[1] + searchRange) > edgemap.rows-1?edgemap.rows -1:(center_point.y + radiusRange[1] + searchRange);
+	
+	Mat iris_area_edgemap = edgemap(Rect(left_top_point,right_bottom_point));
 
-	Point center_output(0,0);
-	int rds_outpoint = 0;
+	cvNamedWindow( "better_result", 1 );
+	imshow("better_result", iris_area_edgemap);
+	cvWaitKey(0);
+	cvDestroyWindow( "better_result" );
+
+	Point new_center_point(center_point.x - left_top_point.x, center_point.y - left_top_point.y);
+
+	Point new_center_output(0,0);
 	int grade = 0;
 
 	vector<int> X, Y;
 
-	for (int i = 0; i < edgemap.rows; i++)
+	for (int i = 0; i < iris_area_edgemap.rows; i++)
 	{
-		for (int j = 0; j < edgemap.cols; j++)
+		for (int j = 0; j < iris_area_edgemap.cols; j++)
 		{
-			if (edgemap.ptr<unsigned char>(i)[j] != 0)
+			if (iris_area_edgemap.ptr<unsigned char>(i)[j] != 0)
 			{
 				Y.push_back(i);
 				X.push_back(j);
@@ -954,66 +906,55 @@ void find_iris_radius(Mat edgemap, Point center_point, int* radiusRange, int sea
 
 	int num = X.size();
 
-	cout<<"num = "<<num<<endl;
+	Mat r = Mat::zeros(num,1,CV_16UC1);
 
-	int* r = new int[num];
-	memset(r,0,sizeof(int)*num);
+	int len = radiusRange[1] - radiusRange[0] + searchRange+1;
 
-	int len = radiusRange[1] - radiusRange[0] + 3;
-	int* x_axis = new int[1000];
-	int* y_axis = new int[1000];
+	Mat y_axis = Mat::zeros(len,1,CV_16UC1);
 
-	memset(x_axis,0,sizeof(int)*1000);			
-	memset(y_axis,0,sizeof(int)*1000);
-
-	for (int i = center_point.x - searchRange; i < center_point.x + searchRange; i++)
+	for (int i = new_center_point.x - searchRange; i < new_center_point.x + searchRange; i++)
 	{
-		for (int j = center_point.y - searchRange; j < center_point.y + searchRange; j++)
+		for (int j = new_center_point.y - searchRange; j < new_center_point.y + searchRange; j++)
 		{
-
-			memset(x_axis,0,sizeof(int)*1000);			
-			memset(y_axis,0,sizeof(int)*1000);
-
-			//memset(r,0,sizeof(int)*num);
+			y_axis.setTo(0);
 			for (int k = 0; k < num; k++)
 			{
-				r[k] = sqrt((i-X[k])*(i-X[k]) + (j-Y[k])*(j-Y[k]));
-				y_axis[r[k]]++;
-				//int index = (r[k] - radiusRange[0]) >= 0?(r[k] - radiusRange[0]):0;
-				//index = (index<radiusRange[1])?index:(radiusRange[1]-1);
-				//y_axis[index]++;
+				r.ptr<int>(k)[0] = sqrt((i-(float)X[k])*(i-(float)X[k]) + (j-(float)Y[k])*(j-(float)Y[k]));
+				int idex = (r.ptr<int>(k)[0] - radiusRange[0] + 1)>(len-1)?(len-1):(r.ptr<int>(k)[0] - radiusRange[0] + 1);
+				idex = idex < 0?0:idex;
+				y_axis.ptr<int>(idex)[0]++;
 			}
+			y_axis.ptr<int>(0)[0] = 0;
+			y_axis.ptr<int>(len-1)[0] = 0;
 
 			int grade_cur = 0;
 			int index = 0;
-			for (int m = 1; m < 999; m++)
+			for (int m = 1; m < len-1; m++)
 			{
-				y_axis[m] = (y_axis[m] + y_axis[m-1] + y_axis[m+1])/3;
-				if (grade_cur < y_axis[m])
+				y_axis.ptr<int>(m)[0] = (y_axis.ptr<int>(m)[0] + y_axis.ptr<int>(m-1)[0] + y_axis.ptr<int>(m+1)[0])/3;
+				if (grade_cur < y_axis.ptr<int>(m)[0])
 				{
-					grade_cur = y_axis[m];
+					grade_cur = y_axis.ptr<int>(m)[0];
 					index = m;
 				}
 			}
 			if (grade_cur > grade)
 			{
-				output_radius = index;
-				output_center.x = i;
-				output_center.y = j;
+				output_radius = radiusRange[0] + index - 1;
+				new_center_output.x = i;
+				new_center_output.y = j;
 				grade = grade_cur;
-				cout<<"grade = "<<grade<<endl;
 			}
 		}
 	}
-	cout<<"3"<<endl;
-	//delete[] r;
-	//delete[] x_axis;
-	//delete[] y_axis;
+	output_center.x = new_center_output.x + left_top_point.x;
+	output_center.y = new_center_output.y + left_top_point.y;
+
+	return 0;
 }
 
-void find_pupil_radius(Mat edgemap, Point center_point, int* radiusRange, int searchRange, Point& output_center, int& output_radius)
+void find_radius(Mat edgemap, Point center_point, int* radiusRange, int searchRange, Point& output_center, int& output_radius)
 {
-
 	Point center_output(0,0);
 	int rds_outpoint = 0;
 	int grade = 0;
@@ -1433,141 +1374,98 @@ void get_pupil_region( Mat img, Mat reflection, Mat& region, Point center, int r
 	}
 }
 
-int fit_lower_eyelid( Mat img, Point iris_center, int iris_rds, Point pupil_center, int pupil_rds, double* range, Mat& coffs)
+int fit_lower_eyelid( Mat img, Point iris_center, int iris_rds, Point pupil_center, int pupil_rds, double* range, double* thresh_canny, Mat& coffs)
 {
 	int score_thresh = 3;
 
 	int rows = img.rows;
 	int cols = img.cols;
 
-	Mat Xmap = Mat::zeros(rows,cols,CV_8UC1);
-	Mat Ymap = Mat::zeros(rows,cols,CV_8UC1);
-	meshgrid(Range(1, cols),Range(1,rows),Xmap,Ymap);
-
-	Mat struct_map(img.size(),CV_8UC1);
-	Canny(img,struct_map,50,80);
-//	soble_double_direction(img,struct_map);
-
-	//for (int i = 0; i < rows; i++)
-	//{
-	//	for (int j = 0; j < cols; j++)
-	//	{
-	//		if (struct_map.ptr<unsigned char>(i)[j] < 80)
-	//		{
-	//			struct_map.ptr<unsigned char>(i)[j] = 0;
-	//		}
-	//		else
-	//		{
-	//			struct_map.ptr<unsigned char>(i)[j] = 255;
-	//		}
-	//		
-	//	}
-	//}
-
-	Mat dymap = Mat::zeros(img.size(),CV_8UC1);
-
-	for (int i = 1; i < rows; i++)
-	{
-		for (int j = 0; j < cols; j++)
-		{
-			dymap.ptr<unsigned char>(i)[j] = img.ptr<unsigned char>(i-1)[j] - img.ptr<unsigned char>(i)[j];
-		}
-	}
-
-	for (int i = 0; i < rows; i++)
-	{
-		for (int j = 0; j < cols; j++)
-		{
-			if (dymap.ptr<unsigned char>(i)[j] <= 0)
-			{
-				struct_map.ptr<unsigned char>(i)[j] = 0;
-			}		
-		}
-	}
-
-	//iris_center.y = iris_center.y - 4;
-
-	Mat dis(img.size(),CV_32FC1);
-	Mat iris(img.size(),CV_8UC1);
-
-	for (int i = 0; i < rows; i++)
-	{
-		for (int j = 0; j < cols; j++)
-		{
-			dis.ptr<float>(i)[j] = sqrt(((float)j-iris_center.x)*(j-iris_center.x)+(i-iris_center.y)*(i-iris_center.y)) - iris_rds;
-			iris.ptr<unsigned char>(i)[j] = (abs(dis.ptr<float>(i)[j]) < 3)?255:0;
-			//iris.ptr<unsigned char>(i)[j] = (abs(dis.ptr<float>(i)[j]) < ((float)iris_rds)/20)?255:0;
-		}
-	}
-
-	//pupil_center.y = pupil_center.y - 4;
-	dis = Mat::zeros(img.size(),CV_32FC1);
-	Mat pupil(img.size(),CV_8UC1);
-	for (int i = 0; i < rows; i++)
-	{
-		for (int j = 0; j < cols; j++)
-		{
-			dis.ptr<float>(i)[j] = sqrt(((float)j-pupil_center.x)*(j-pupil_center.x)+(i-pupil_center.y)*(i-pupil_center.y)) - pupil_rds;
-			pupil.ptr<unsigned char>(i)[j] = (abs(dis.ptr<float>(i)[j]) < ((float)pupil_rds)/5)?255:0;
-		}
-	}
-
-	Mat upper_rect(img.size(),CV_8UC1);
-
-	for (int i = 0; i < rows; i++)
-	{
-		for (int j = 0; j < cols; j++)
-		{
-			if ((i >= iris_center.y + iris_rds*range[0]) && (i <= iris_center.y + iris_rds*range[1]) && (j >= iris_center.x - iris_rds) && (j <= iris_center.x + iris_rds) && (iris.ptr<unsigned char>(i)[j] == 0) && (pupil.ptr<unsigned char>(i)[j] == 0))
-			//if ((i >= iris_center.y + iris_rds*range[0]) && (i <= iris_center.y + iris_rds*range[1]) && (j >= iris_center.x - iris_rds) && (j <= iris_center.x + iris_rds) && (pupil.ptr<unsigned char>(i)[j] == 0))
-			{
-				upper_rect.ptr<unsigned char>(i)[j] = 255;
-			}
-			else
-			{
-				upper_rect.ptr<unsigned char>(i)[j] = 0;
-				struct_map.ptr<unsigned char>(i)[j] = 0;
-			}
-			if (img.ptr<unsigned char>(i)[j] >= 100)
-			{
-				struct_map.ptr<unsigned char>(i)[j] = 0;
-			}
-		}
-	}
+	Mat struct_map;
+	Canny(img, struct_map, thresh_canny[0], thresh_canny[1]);
 
 	Vector<int> X, Y;
 	int xmin = 1000;
 	int ymin = 1000;
 	int xmax = 0;
 	int ymax = 0;
+
 	for (int i = 0; i < rows; i++)
 	{
 		for (int j = 0; j < cols; j++)
 		{
-			if (struct_map.ptr<unsigned char>(i)[j] != 0)
+			//if (img.ptr<unsigned char>(i-2)[j] - img.ptr<unsigned char>(i+2)[j] <= 0)
+			//{
+			//	struct_map.ptr<unsigned char>(i)[j] = 0;
+			//}
+
+			float dis = ((float)j-iris_center.x)*(j-iris_center.x)+(i-iris_center.y)*(i-iris_center.y);
+			if (i < iris_center.y + range[0]*iris_rds || i > iris_center.y + range[1]*iris_rds || j < iris_center.x - iris_rds || j > iris_center.x + iris_rds || abs(dis - iris_rds*iris_rds) <= 4)
 			{
-				X.push_back(j);
-				Y.push_back(i);
-				xmin = xmin > j?j:xmin;
-				xmax = xmax < j?j:xmax;
-				ymin = ymin > i?i:ymin;
-				ymax = ymax < i?i:ymax;
+				struct_map.ptr<unsigned char>(i)[j] = 0;
 			}
+			//else if(struct_map.ptr<unsigned char>(i)[j] != 0)
+			//{
+			//	X.push_back(j);
+			//	Y.push_back(i);
+			//	xmin = xmin > j?j:xmin;
+			//	xmax = xmax < j?j:xmax;
+			//	ymin = ymin > i?i:ymin;
+			//	ymax = ymax < i?i:ymax;
+			//}
 		}
 	}
 
+	cvNamedWindow( "better_result", 1 );
+	imshow("better_result", struct_map);
+	cvWaitKey(0);
+	cvDestroyWindow( "better_result" );
+
+	vector<vector<Point> > contours;
+	findContours(struct_map, contours, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
+
+	//struct_map.setTo(0);
+	
+	int size_contours = contours.size();
+	int max_index = 0;
+	int max_area = 0;
+	for (int i = 0; i < size_contours; i++)
+	{
+		if (contours[i].size() > max_area)
+		{
+			max_area = contours[i].size();
+			max_index = i;
+		}
+	}
+
+	vector<Point> area = contours[max_index];
+	struct_map.setTo(0);
+	for (int i = 0; i < area.size(); i++)
+	{
+			X.push_back(area[i].x);
+			Y.push_back(area[i].y);
+			xmin = xmin > area[i].x?area[i].x:xmin;
+			xmax = xmax < area[i].x?area[i].x:xmax;
+			ymin = ymin > area[i].y?area[i].y:ymin;
+			ymax = ymax < area[i].y?area[i].y:ymax;
+			struct_map.ptr<unsigned char>(area[i].y)[area[i].x] = 255;
+	}
+
+	cvNamedWindow( "better_result", 1 );
+	imshow("better_result", struct_map);
+	cvWaitKey(0);
+	cvDestroyWindow( "better_result" );
+
 	int num = Y.size();
 
-	if (num <= iris_rds/1.5)
+	if (num <= 5)
 	{
 		coffs = NULL;
+		return -1;
 	}
 
 	int xc = (xmin + xmax)/2;
 	int yc = (ymax + ymin)/2;
-
-	int pts_x[3] = {xmin, xc, xmax};
-	int pts_y[9] = {ymin, yc, yc, ymin, yc, ymin, yc, yc, ymin};
 
 	vector<Point2f> uppers;
 	vector<Point2f> middles;
@@ -1732,102 +1630,92 @@ int fit_upper_eyelid( Mat& img, Point iris_center, int iris_rds, Point pupil_cen
 	double thresh = 15;
 	soble_double_direction(img,iris_mask,thresh,struct_map);
 
-	removeSmallBlobs(struct_map,10);	
+	removeSmallBlobs(struct_map,10);
 
-	//soble_double_direction(img,struct_map);
-	//Canny(img,struct_map,50,60);
+	for (int i = 2; i < rows-2; i++)
+	{
+		for (int j = 0; j < cols; j++)
+		{
+			if (img.ptr<unsigned char>(i-2)[j] - img.ptr<unsigned char>(i+2)[j] <= 0)
+			{
+				struct_map.ptr<unsigned char>(i)[j] = 0;
+			}
+			float dis = (j-iris_center.x)*(j-iris_center.x)+(i-iris_center.y)*(i-iris_center.y);
+			if (abs(dis - iris_rds*iris_rds) <= 4 || i > iris_center.y || i < iris_center.y-iris_rds || j < iris_center.x - iris_rds || j > iris_center.x + iris_rds)
+			{
+				struct_map.ptr<unsigned char>(i)[j] = 0;
+			}
+		}
+	}
 
-//	Mat dymap = Mat::zeros(img.size(),CV_8UC1);
+	//Vector<int> X, Y;
+	//int xmin = 1000;
+	//int ymin = 1000;
+	//int xmax = 0;
+	//int ymax = 0;
 
-	//for (int i = 0; i < rows-1; i++)
+	//vector<Point2f> final_points;
+
+	//for (int i = cols-1; i > 0; i--)
 	//{
-	//	for (int j = 0; j < cols; j++)
+	//	for (int j = rows-1; j > 0; j--)
 	//	{
-	//		dymap.ptr<unsigned char>(i)[j] = img.ptr<unsigned char>(i)[j] - img.ptr<unsigned char>(i+1)[j];
-	//	}
-	//}
-
-	//for (int i = 0; i < rows; i++)
-	//{
-	//	for (int j = 0; j < cols; j++)
-	//	{
-	//		if (dymap.ptr<unsigned char>(i)[j] <= 0)
+	//		if (struct_map.ptr<unsigned char>(j)[i] != 0)
 	//		{
-	//			struct_map.ptr<unsigned char>(i)[j] = 0;
-	//		}		
+	//			X.push_back(i);
+	//			Y.push_back(j);
+	//			xmin = xmin > i?i:xmin;
+	//			xmax = xmax < i?i:xmax;
+	//			ymin = ymin > j?j:ymin;
+	//			ymax = ymax < j?j:ymax;
+	//			final_points.push_back(Point2f(i,j));
+	//			break;
+	//		}
 	//	}
 	//}
 
-	Mat dis(img.size(),CV_32FC1);
-	//iris_center.y = iris_center.y - 4;
 
-	//Mat dis(Xmap.size(),CV_32FC1);
-	//Mat iris(img.size(),CV_8UC1);
+	//cvNamedWindow( "better_result", 1 );
+	//imshow("better_result", struct_map);
+	//cvWaitKey(0);
+	//cvDestroyWindow( "better_result" );
 
-	//for (int i = 0; i < rows; i++)
-	//{
-	//	for (int j = 0; j < cols; j++)
-	//	{
-	//		dis.ptr<float>(i)[j] = sqrt((Xmap.ptr<float>(i)[j]-iris_center.x)*(Xmap.ptr<float>(i)[j]-iris_center.x)+(Ymap.ptr<float>(i)[j]-iris_center.y)*(Ymap.ptr<float>(i)[j]-iris_center.y)) - iris_rds;
-	//		iris.ptr<unsigned char>(i)[j] = (abs(dis.ptr<float>(i)[j]) < iris_rds/10)?255:0;
-	//	}
-	//}
+	vector<vector<Point> > contours;
+	findContours(struct_map, contours, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
 
-	//pupil_center.y = pupil_center.y - 4;
-	Mat pupil(img.size(),CV_8UC1);
-	for (int i = 0; i < rows; i++)
+	//struct_map.setTo(0);
+	
+	int size_contours = contours.size();
+	int max_index = 0;
+	int max_area = 0;
+	for (int i = 0; i < size_contours; i++)
 	{
-		for (int j = 0; j < cols; j++)
+		if (contours[i].size() > max_area)
 		{
-			dis.ptr<float>(i)[j] = sqrt((j-iris_center.x)*(j-iris_center.x)+(i-iris_center.y)*(i-iris_center.y)) - iris_rds;
-			//pupil.ptr<unsigned char>(i)[j] = (abs(dis.ptr<float>(i)[j]) < 4)?255:0;
-
-			if (abs(dis.ptr<float>(i)[j]) < 4 || i > iris_center.y + iris_rds || i < iris_center.y-iris_rds || j < iris_center.x - iris_rds || j > iris_center.x + iris_rds)
-			{
-				struct_map.ptr<unsigned char>(i)[j] = 0;
-			}
+			max_area = contours[i].size();
+			max_index = i;
 		}
 	}
 
-	Mat upper_rect(img.size(),CV_8UC1);
-
-	for (int i = 0; i < rows; i++)
-	{
-		for (int j = 0; j < cols; j++)
-		{
-			if ((i >= iris_center.y - iris_rds*range[1]) && (i <= iris_center.y - iris_rds*range[0]) && (j >= iris_center.x - iris_rds) && (j <= iris_center.x + iris_rds) && (pupil.ptr<unsigned char>(i)[j] == 0))
-			{
-				upper_rect.ptr<unsigned char>(i)[j] = 255;
-			}
-			else
-			{
-				upper_rect.ptr<unsigned char>(i)[j] = 0;
-				struct_map.ptr<unsigned char>(i)[j] = 0;
-			}
-		}
-	}
+	vector<Point> area = contours[max_index];
 
 	Vector<int> X, Y;
 	int xmin = 1000;
 	int ymin = 1000;
 	int xmax = 0;
 	int ymax = 0;
-	for (int i = 0; i < rows; i++)
-	{
-		for (int j = 0; j < cols; j++)
-		{
-			if (struct_map.ptr<unsigned char>(i)[j] != 0)
-			{
-				X.push_back(j);
-				Y.push_back(i);
-				xmin = xmin > j?j:xmin;
-				xmax = xmax < j?j:xmax;
-				ymin = ymin > i?i:ymin;
-				ymax = ymax < i?i:ymax;
-			}
-		}
-	}
 
+	for (int j = 0; j < max_area; j++)
+	{
+		//struct_map.ptr<unsigned char>(area[j].y)[area[j].x] = 255;
+		X.push_back(area[j].x);
+		Y.push_back(area[j].y);
+		xmin = xmin > area[j].x?area[j].x:xmin;
+		xmax = xmax < area[j].x?area[j].x:xmax;
+		ymin = ymin > area[j].y?area[j].y:ymin;
+		ymax = ymax < area[j].y?area[j].y:ymax;
+	}
+	
 	int num = Y.size();
 
 	if (num == 0)
@@ -1846,9 +1734,6 @@ int fit_upper_eyelid( Mat& img, Point iris_center, int iris_rds, Point pupil_cen
 
 	int xc = (xmin+xmax)/2;
 	int yc = (ymax + ymin)/2;
-
-	int pts_x[3] = {xmin, xc, xmax};
-	int pts_y[9] = {ymax, yc, yc, ymax, yc, ymax, yc, yc, ymax};
 
 	vector<Point2f> uppers;
 	vector<Point2f> middles;
@@ -1887,6 +1772,14 @@ int fit_upper_eyelid( Mat& img, Point iris_center, int iris_rds, Point pupil_cen
 	Point ind(0,0);
 	minMaxLoc(sum_D, &minsum,0,&ind);
 
+	//drawPolynomial(coef1,2,img);
+	//drawPolynomial(coef2,2,img);
+	//drawPolynomial(coef3,2,img);
+	//cvNamedWindow( "upper_eyelid", 1 );
+	//imshow("upper_eyelid", img);
+	//cvWaitKey(0);
+	//cvDestroyWindow( "upper_eyelid" );
+
 	Mat D_new = Mat::zeros(num,1,CV_8UC1);
 
 	for (int i = 0; i < num; i++)
@@ -1918,10 +1811,25 @@ int fit_upper_eyelid( Mat& img, Point iris_center, int iris_rds, Point pupil_cen
 		final_points.push_back(Point2f(X_new[i],Y_new[i]));
 	}
 
+	//for (int i = 0; i < final_points.size(); i++)
+	//{
+	//	img.ptr<unsigned char>((int)final_points[i].y)[(int)final_points[i].x] = 255;
+	//}
+
+	//cvNamedWindow( "upper_eyelid", 1 );
+	//imshow("upper_eyelid", img);
+	//cvWaitKey(0);
+	//cvDestroyWindow( "upper_eyelid" );
+
+	//vector<Point2f> f;
+
+	//f.push_back(Point2f(final_points[1].x,final_points[1].y));
+	//f.push_back(Point2f(final_points[final_points.size()/2].x,final_points[final_points.size()/2].y));
+	//f.push_back(Point2f(final_points[final_points.size()-2].x,final_points[final_points.size()-2].y));
+
 	fitPolynomial(final_points, 2, coffs);
 
 	coffs.ptr<float>(2)[0] += offset;
-
 
 	if (coffs.ptr<float>(0)[0] > 1/((float)iris_rds) || coffs.ptr<float>(0)[0] < ((float)-1.0)/20/iris_rds)
 	{
@@ -2066,7 +1974,29 @@ int eyelash_pixels_location(Mat& src, Point iris_center, int iris_rds, Point pup
 	int i, j;
 	Vector<Point> ES_points, IR_points;
 
-	for(i = iris_center.y-1.1*iris_rds; i < iris_center.y+1.1*iris_rds; i++)
+	////for(i = iris_center.y-1.1*iris_rds; i < iris_center.y+1.1*iris_rds; i++)
+	////	for(j = iris_center.x - iris_rds; j < iris_center.x + iris_rds; j++)
+	////	{
+	////		double dist_to_iris = sqrt(((double)i-iris_center.y)*(i-iris_center.y)+(j-iris_center.x)*(j-iris_center.x));
+	////		double dist_to_pupil = sqrt(((double)i-pupil_center.y)*(i-pupil_center.y)+(j-pupil_center.x)*(j-pupil_center.x));
+	////		if(dist_to_iris < iris_rds && dist_to_pupil > pupil_rds)
+	////		{
+	////			ES_points.push_back(cv::Point(j,i));
+	////		}
+	////	}
+
+	////for(i = iris_center.y; i < iris_center.y + 0.5*iris_rds + 0.5*pupil_rds; i++)
+	////	for(j = iris_center.x - 0.5*iris_rds; j < iris_center.x + 0.5*iris_rds; j++)
+	////	{
+	////		double dist_to_iris = sqrt(((double)i-iris_center.y)*(i-iris_center.y)+(j-iris_center.x)*(j-iris_center.x));
+	////		double dist_to_pupil = sqrt(((double)i-pupil_center.y)*(i-pupil_center.y)+(j-pupil_center.x)*(j-pupil_center.x));
+	////		if(dist_to_iris < 0.5*iris_rds + 0.5*pupil_rds && dist_to_pupil > pupil_rds && src.ptr<unsigned char>(i)[j] < 200)
+	////		{
+	////			IR_points.push_back(cv::Point(j,i));
+	////		}
+	////	}
+
+	for(i = iris_center.y-1.1*iris_rds; i < iris_center.y+pupil_rds; i++)
 		for(j = iris_center.x - iris_rds; j < iris_center.x + iris_rds; j++)
 		{
 			double dist_to_iris = sqrt(((double)i-iris_center.y)*(i-iris_center.y)+(j-iris_center.x)*(j-iris_center.x));
@@ -2077,38 +2007,43 @@ int eyelash_pixels_location(Mat& src, Point iris_center, int iris_rds, Point pup
 			}
 		}
 
-	for(i = iris_center.y; i < iris_center.y + 0.5*iris_rds + 0.5*pupil_rds; i++)
-		for(j = iris_center.x - 0.5*iris_rds; j < iris_center.x + 0.5*iris_rds; j++)
-		{
-			double dist_to_iris = sqrt(((double)i-iris_center.y)*(i-iris_center.y)+(j-iris_center.x)*(j-iris_center.x));
-			double dist_to_pupil = sqrt(((double)i-pupil_center.y)*(i-pupil_center.y)+(j-pupil_center.x)*(j-pupil_center.x));
-			if(dist_to_iris < 0.5*iris_rds + 0.5*pupil_rds && dist_to_pupil > pupil_rds && src.ptr<unsigned char>(i)[j] < 200)
-			{
-				IR_points.push_back(cv::Point(j,i));
-			}
-		}
+	//for(i = iris_center.y; i < iris_center.y + iris_rds; i++)
+	//	for(j = iris_center.x - iris_rds; j < iris_center.x + iris_rds; j++)
+	//	{
+	//		double dist_to_iris = sqrt(((double)i-iris_center.y)*(i-iris_center.y)+(j-iris_center.x)*(j-iris_center.x));
+	//		double dist_to_pupil = sqrt(((double)i-pupil_center.y)*(i-pupil_center.y)+(j-pupil_center.x)*(j-pupil_center.x));
+	//		if(dist_to_iris < 0.5*iris_rds + 0.5*pupil_rds && dist_to_pupil > pupil_rds && src.ptr<unsigned char>(i)[j] < 200)
+	//		{
+	//			IR_points.push_back(cv::Point(j,i));
+	//		}
+	//	}
 
-	if (IR_points.size() == 0 || ES_points.size() == 0)
-	{
-		return -1;
-	}
 
-	float sum=0,s=0,mean,stand;
-	for(i = 0; i < IR_points.size(); i++)
-	{
-		sum += src.data[IR_points[i].y*src.cols+IR_points[i].x];
-	}
-	mean = sum/IR_points.size();
+	//if (IR_points.size() == 0 || ES_points.size() == 0)
+	//{
+	//	return -1;
+	//}
 
-	for(i=0;i<IR_points.size();i++)
-	{
-		s += (src.data[IR_points[i].y*src.cols+IR_points[i].x] - mean)*(src.data[IR_points[i].y*src.cols+IR_points[i].x] - mean);
-	}
+	//float sum=0,s=0,mean,stand;
+	//for(i = 0; i < IR_points.size(); i++)
+	//{
+	//	sum += src.data[IR_points[i].y*src.cols+IR_points[i].x];
+	//}
+	//mean = sum/IR_points.size();
 
-	stand = sqrt(s/IR_points.size());
+	//for(i=0;i<IR_points.size();i++)
+	//{
+	//	s += (src.data[IR_points[i].y*src.cols+IR_points[i].x] - mean)*(src.data[IR_points[i].y*src.cols+IR_points[i].x] - mean);
+	//}
 
-	int T_low = mean - 2.5*stand;
-	int T_high = mean + 1.5*stand;
+	//stand = sqrt(s/IR_points.size());
+
+	//int T_low = mean - 2*stand;
+	//int T_high = mean + 1.5*stand;
+
+	int T_low, T_high;
+
+	cal_thresh_using_hist(src,0.05,0.3,T_low,T_high);
 
 	for(i = 0; i < ES_points.size(); i++)
 	{
@@ -2118,13 +2053,13 @@ int eyelash_pixels_location(Mat& src, Point iris_center, int iris_rds, Point pup
 		}
 	}
 
-	for(i = 0; i < IR_points.size(); i++)
-	{
-		if(src.data[IR_points[i].y*src.cols+IR_points[i].x] < T_low || src.data[IR_points[i].y*src.cols+IR_points[i].x] > T_high)
-		{
-			eyelash_points.push_back(IR_points[i]);
-		}
-	}
+	//for(i = 0; i < IR_points.size(); i++)
+	//{
+	//	if(src.data[IR_points[i].y*src.cols+IR_points[i].x] < T_low || src.data[IR_points[i].y*src.cols+IR_points[i].x] > T_high)
+	//	{
+	//		eyelash_points.push_back(IR_points[i]);
+	//	}
+	//}
 
 	return 0;
 }
@@ -2152,25 +2087,19 @@ int iris_preprecessing(Mat src, Point pupil_center, int pupil_rds,Mat& iris_mask
 		return -1;
 	}
 
-	float sum=0,s=0,mean,stand;
-	for(i = 0; i < IR_points.size(); i++)
+	Mat valid_points = Mat::zeros(IR_points.size(),1,CV_32FC1);
+	for (int i = 0; i < IR_points.size(); i++)
 	{
-		sum += src.data[IR_points[i].y*src.cols+IR_points[i].x];
-	}
-	mean = sum/IR_points.size();
-
-	for(i=0;i<IR_points.size();i++)
-	{
-		s += (src.data[IR_points[i].y*src.cols+IR_points[i].x] - mean)*(src.data[IR_points[i].y*src.cols+IR_points[i].x] - mean);
+		valid_points.ptr<float>(i)[0] = src.ptr<unsigned char>(IR_points[i].y)[IR_points[i].x];
 	}
 
-	stand = sqrt(s/IR_points.size());
+	Mat mu_mat, sigma_mat;
+	meanStdDev(valid_points,mu_mat,sigma_mat);
+	double mean = mu_mat.ptr<double>(0)[0];
+	double stand = sigma_mat.ptr<double>(0)[0];
 
 	int T_low = mean - 3.5*stand;
 	int T_high = mean + 2.5*stand;
-
-	cout<<"T_low = "<<T_low<<endl;
-	cout<<"T_high = "<<T_high<<endl;
 
 	for ( i = 0; i < src.rows; i++)
 	{
@@ -2274,8 +2203,6 @@ int computeU(Mat& u, Mat v, Mat f,double lambda,double theta, double sigma, doub
 	Mat fin = u.clone();
 	Mat fx = Mat::zeros(u.rows,u.cols,CV_8UC1);
 	Mat fy = Mat::zeros(u.rows,u.cols,CV_8UC1);
-
-	cout<<"11"<<endl;
 
 	for (int i = 0; i < u.rows; i++)
 	{
@@ -2388,10 +2315,10 @@ int computeU(Mat& u, Mat v, Mat f,double lambda,double theta, double sigma, doub
 	cout<<"444"<<endl;
 	int d[2] = {-wx.rows,-1};
 
-	Mat A;
+	SparseMat A;
 	spdiags(B,A,d,k,k);
 
-	cout<<"004"<<endl;
+	cout<<A<<endl;
 
 	Mat e = dx.clone();
 	Mat s = dx.clone();
@@ -2436,47 +2363,51 @@ int computeU(Mat& u, Mat v, Mat f,double lambda,double theta, double sigma, doub
 
 	cout<<"777"<<endl;
 
-	Mat trans_A;
-	transpose(A,trans_A);
-	add(A,trans_A,A);
-	add(A,tmp_diags,A);
+	//Mat trans_A;
+	//transpose(A,trans_A);
+	//add(A,trans_A,A);
+	//add(A,tmp_diags,A);
 
-	Mat tin;
-	subtract(f,v,tin);
+	//Mat tin;
+	//subtract(f,v,tin);
 
-	int tmp_num = tin.rows*tin.cols;
-	Mat tin_col = Mat::zeros(tmp_num,1,CV_32FC1);
-	for (int i = 0; i < tin.cols; i++)
-	{
-		for (int j = 0; j < tin.rows; j++)
-		{
-			tin_col.ptr<float>(j*tin.cols+i)[0] = tin.ptr<float>(j)[i];
-		}
-	}
-	Mat tout;
+	//int tmp_num = tin.rows*tin.cols;
+	//Mat tin_col = Mat::zeros(tmp_num,1,CV_32FC1);
+	//for (int i = 0; i < tin.cols; i++)
+	//{
+	//	for (int j = 0; j < tin.rows; j++)
+	//	{
+	//		tin_col.ptr<float>(j*tin.cols+i)[0] = tin.ptr<float>(j)[i];
+	//	}
+	//}
+	//Mat tout;
 
-	cout<<"777"<<endl;
-	solve(A,tin_col,tout,DECOMP_CHOLESKY);
-	cout<<"999"<<endl;
+	//cout<<"777"<<endl;
+	//solve(A,tin_col,tout,DECOMP_CHOLESKY);
+	//cout<<"999"<<endl;
 
-	for (int i = 0; i < u.cols; i++)
-	{
-		for (int j = 0; j < u.rows; j++)
-		{
-			u.ptr<float>(j)[i] = tout.ptr<float>(j*u.cols+i)[0];
-		}
-	}
-	cout<<"888"<<endl;
+	//for (int i = 0; i < u.cols; i++)
+	//{
+	//	for (int j = 0; j < u.rows; j++)
+	//	{
+	//		u.ptr<float>(j)[i] = tout.ptr<float>(j*u.cols+i)[0];
+	//	}
+	//}
+	//cout<<"888"<<endl;
 	return 0;
 }
 
-int spdiags(Mat src, Mat& dst, int* d, int m, int n)
+int spdiags(Mat src, SparseMat& sparse_dst, int* d, int m, int n)
 {
 	int d_size = sizeof(d)/sizeof(d[0]);
 
-	dst = Mat::zeros(m,n,CV_32FC1);
+//	dst = Mat::zeros(m,n,CV_32FC1);
 //	dst = Mat::zeros(100,100,CV_32FC1);
 	cout<<"d_size = "<<d_size<<endl;
+
+	const int dims = 2;
+	int size[] = {src.rows, src.cols}; // rows and columns if in two dimensions
+	sparse_dst = SparseMat(dims, size, CV_32F);
 
 	for (int i = 0; i < d_size; i++)
 	{
@@ -2494,13 +2425,19 @@ int spdiags(Mat src, Mat& dst, int* d, int m, int n)
 		{
 			if (init_x < n && init_y < m)
 			{
+				int idx[2];
+				idx[0] = init_y++;
+				idx[1] = init_x++;
+
+				
 				if (src.type() == CV_8UC1)
 				{
-					dst.ptr<unsigned char>(init_y++)[init_x++] = src.ptr<unsigned char>(i)[j];
+
+					sparse_dst.ref<float>(idx) = src.ptr<unsigned char>(i)[j];
 				}
 				else
 				{
-					dst.ptr<float>(init_y++)[init_x++] = src.ptr<float>(i)[j];
+					sparse_dst.ref<float>(idx) = src.ptr<float>(i)[j];
 				}
 			}
 			else
@@ -2509,7 +2446,6 @@ int spdiags(Mat src, Mat& dst, int* d, int m, int n)
 			}
 		}
 	}
-
 	return 0;
 }
 
@@ -2717,4 +2653,195 @@ Mat conv2(const Mat &img, const Mat& ikernel, int type)
 		 dst = dst.colRange((kernel.cols-1)/2, dst.cols - kernel.cols/2).rowRange((kernel.rows-1)/2, dst.rows - kernel.rows/2);
 	 }
 	 return dst;
+}
+
+int iris_normalization(Mat& src, Mat& dst, Mat& iris_mask, Mat& mask_dst, Point pupil_center, int pupil_rds, Point iris_center, int iris_rds, int radpixels, int angulardiv)
+{
+	int radiuspixels;
+	int angledivisions;
+	int width, height;
+	double r;
+	double *theta, *b, xcosmat, xsinmat, rmat;
+	double *xo, *yo;
+	int i, j;
+	double x_iris, y_iris, r_iris, x_pupil, y_pupil, r_pupil, ox, oy;
+	int sgn;
+	double phi;
+	double a;
+	int *x, *y, *xp, *yp;
+	int len;
+	double sum, avg;
+	int count;
+
+	double pi = 3.14159265;
+
+	radiuspixels = radpixels + 2;
+	angledivisions = angulardiv - 1;
+
+	theta = (double*)malloc(sizeof(double)*(angledivisions+1));
+
+	for (i = 0; i<angledivisions+1; i++)
+		theta[i] = 2*i*pi/angledivisions;
+
+	x_iris = (double)iris_center.x;
+	y_iris = (double)iris_center.y;
+	r_iris = (double)iris_rds;
+	x_pupil = (double)pupil_center.x;
+	y_pupil = (double)pupil_center.y;
+	r_pupil = (double)pupil_rds;
+
+	//calculate displacement of pupil center from the iris center
+	ox = x_pupil - x_iris;
+	oy = y_pupil - y_iris;
+
+	if(ox <= 0)
+		sgn = -1;
+	else
+		sgn = 1;
+
+	if(ox == 0 && oy > 0)
+		sgn = 1;
+
+	a = ox*ox+oy*oy;
+
+	if(ox == 0)
+		phi = pi/2;
+	else
+		phi = atan(oy/ox);
+
+	b = (double*)malloc(sizeof(double)*(angledivisions+1));
+
+	width = angledivisions+1;
+	height = radiuspixels-2;
+	xo = (double*)malloc(sizeof(double)*(radiuspixels-2)*(angledivisions+1));
+	yo = (double*)malloc(sizeof(double)*(radiuspixels-2)*(angledivisions+1));
+
+	for(i = 0; i < angledivisions+1; i++)
+	{
+		b[i] = sgn*cos(pi-phi-theta[i]);
+		r = sqrt(a)*b[i]+sqrt(a*b[i]*b[i]-(a-r_iris*r_iris));
+		r -= r_pupil;
+
+		// calculate cartesian location of each data point around the circular iris region
+		xcosmat = cos(theta[i]);
+		xsinmat = sin(theta[i]);
+		/* exclude values at the boundary of the pupil iris border, and the iris scelra border
+		   as these may not correspond to areas in the iris region and will introduce noise.		
+		   ie don't take the outside rings as iris data.*/
+
+		for (j = 0; j<radiuspixels; j++)
+		{
+			rmat = r*j/(radiuspixels-1);
+			rmat += r_pupil;
+			if (j>0 && j<radiuspixels-1)
+			{
+				xo[(j-1)*(angledivisions+1)+i] = rmat*xcosmat+x_pupil;
+				yo[(j-1)*(angledivisions+1)+i] = -rmat*xsinmat+y_pupil;
+			}
+		}
+	}
+
+
+	dst = Mat::zeros(height,width,CV_8U);
+	mask_dst = Mat::zeros(height,width,CV_8U);
+	interp2(src,xo,yo,width,height,dst);
+	interp2(iris_mask,xo,yo,width,height,mask_dst);
+
+	//for(i = 0; i < height; i++)
+	//	for(j = 0; j < width; j++)
+	//	{
+	//		if(mask_dst.data[i*width+j] == 0)
+	//			dst.data[i*width+j] = 255;
+	//		else if(_isnan(dst.data[i*width+j]))
+	//			dst.data[i*width+j] = 255;
+	//	}
+	
+	return 0;
+}
+
+int cal_thresh_using_hist(Mat src, double low_thresh_per, double high_thresh_per, int& low_thresh, int& high_thresh)
+{
+	double num_low_thresh = low_thresh_per*src.rows*src.cols;
+	double num_high_thresh = high_thresh_per*src.rows*src.cols;
+
+	const int channels[1]={0};
+    const int histSize[1]={256};
+    float hranges[2]={0,255};
+    const float* ranges[1]={hranges};
+	Mat hist;
+    calcHist(&src,1,channels,Mat(),hist,1,histSize,ranges);
+
+	low_thresh = -1;
+	high_thresh = -1;
+	float temp_num = 0;
+
+	//double min,max;
+
+	//minMaxLoc(hist,&min,&max);
+
+	//Mat hist_for_show = Mat::zeros(max/2,256,CV_8UC1);
+	//for (int i = 1; i < hist_for_show.cols-1; i++)
+	//{
+	//	for (int j = 0; j < hist_for_show.rows; j++)
+	//	{
+	//		if (j < (hist.ptr<float>(i)[0]+hist.ptr<float>(i-1)[0]+hist.ptr<float>(i+1)[0])/6)
+	//		{
+	//			hist_for_show.ptr<unsigned>(j)[i] = 255;
+	//		}		
+	//	}
+	//}
+
+	//Mat points(src.rows*src.cols, 1, CV_32FC1);
+
+	//for (int i = 0; i < src.rows; i++)
+	//{
+	//	for (int j = 0; j < src.cols; j++)
+	//	{
+	//		points.ptr<float>(i*src.cols+j)[0] = src.ptr<unsigned char>(i)[j];
+	//	}
+	//}
+
+	//cout<<"OK"<<endl;
+	//Mat bestLable;
+	//int attempts = 15;
+	//Mat centers;
+
+
+
+	//kmeans(points,2,bestLable,TermCriteria(CV_TERMCRIT_ITER|CV_TERMCRIT_EPS, 10, 1.0), attempts, KMEANS_RANDOM_CENTERS, centers);
+
+	////kmeans(kmean_hist,2,bestLable,TermCriteria(CV_TERMCRIT_ITER|CV_TERMCRIT_EPS, 10000, 0.0001), attempts, KMEANS_PP_CENTERS, centers);
+
+	//for (int i = 0; i < src.rows; i++)
+	//{
+	//	for (int j = 0; j < src.cols; j++)
+	//	{
+	//		if (bestLable.ptr<float>(i*src.cols+j)[0] != 0)
+	//		{
+	//			src.ptr<unsigned char>(i)[j] = 255;
+	//		}
+	//	}
+	//}
+
+	//cvNamedWindow( "better_result", 1 );
+	//imshow("better_result", src);
+	//cvWaitKey(0);
+	//cvDestroyWindow( "better_result" );
+
+	for (int i = 0; i < 255; i++)
+	{
+		temp_num += hist.ptr<float>(i)[0];
+		
+		if (temp_num > num_low_thresh && low_thresh == -1)
+		{
+			low_thresh = i;
+		}
+		if (temp_num > num_high_thresh && high_thresh == -1)
+		{
+			high_thresh = i;
+			break;
+		}
+	}
+
+	return 0;
 }

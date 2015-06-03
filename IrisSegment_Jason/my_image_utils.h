@@ -37,13 +37,13 @@ int LeastSquares(vector<cv::Point> points, cv::Point& center, int& rds);
 
 int interp2(Mat src, double* xo, double* yo, int width, int height, Mat& dst);
 
-void findCenter(Mat edgemap, int* radiusRange, int points_gap, Point &center_point);
+int findCenter(Mat edgemap, int* radiusRange, int points_gap, Point &center_point);
 
 void find_radius(Mat edgemap, Point center_point, int* radiusRange, int searchRange, Point& output_center, int& output_radius);
 
-void find_iris_radius(Mat edgemap, Point center_point, int* radiusRange, int searchRange, Point& output_center, int& output_radius);
+int find_iris_radius(Mat edgemap, Point center_point, int* radiusRange, int searchRange, Point& output_center, int& output_radius);
 
-void find_pupil_radius(Mat edgemap, Point center_point, int* radiusRange, int searchRange, Point& output_center, int& output_radius);
+int find_pupil_radius(Mat edgemap, Point center_point, int* radiusRange, int searchRange, Point& output_center, int& output_radius);
 
 void mask_lower_region(Mat img, Point center, int radius, double* extend, Mat& mask, double* thresh_high, double* thresh_low, double& cir_correct);
 
@@ -61,7 +61,7 @@ void segment_angle_range(Mat img, Mat& mask, Point center, int radius, double* a
 
 void get_pupil_region( Mat img, Mat reflection, Point center, int radius, double* thresh);
 
-int fit_lower_eyelid( Mat img, Point iris_center, int iris_rds, Point pupil_center, int pupil_rds, double* range, Mat& coffs);
+int fit_lower_eyelid( Mat img, Point iris_center, int iris_rds, Point pupil_center, int pupil_rds, double* range, double* thresh_canny, Mat& coffs);
 
 int fit_upper_eyelid( Mat& img, Point iris_center, int iris_rds, Point pupil_center, int pupil_rds, double* range, double offset, bool save_image, Mat& coffs);
 
@@ -83,7 +83,7 @@ Mat conv2(const Mat &img, const Mat& ikernel, int type);
 
 int computeU(Mat& u, Mat v, Mat f,double lambda,double theta, double sigma, double ep, int k);
 
-int spdiags(Mat src, Mat& dst, int* d, int m, int n);
+int spdiags(Mat src, SparseMat& sparse_dst, int* d, int m, int n);
 
 void cholesky_decomposition( const Mat& A, Mat& L );
 
@@ -94,5 +94,9 @@ int cal_energy(Mat im_s, Mat im, double lambda, Mat G, double ep, Mat& rtv_e);
 int fspecial(double sigma, Mat& G_kernal);
 
 int gau_filter(Mat in, Mat g, Mat& dst);
+
+int iris_normalization(Mat& src, Mat& dst, Mat& iris_mask, Mat& mask_dst, Point pupil_center, int pupil_rds, Point iris_center, int iris_rds, int radpixels, int angulardiv);
+
+int cal_thresh_using_hist(Mat src, double low_thresh_per, double high_thresh_per, int& low_thresh, int& high_thresh);
 
 #endif

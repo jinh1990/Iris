@@ -80,7 +80,7 @@ int drawPolynomial(Mat coef, int type, Mat &pic)
 			{
 				continue;
 			}
-			pic.ptr<unsigned char>(y)[x] = 0;
+			pic.ptr<unsigned char>(y)[x] = 255;
 		}
 		else if (type == 1)
 		{
@@ -88,7 +88,7 @@ int drawPolynomial(Mat coef, int type, Mat &pic)
 
 			for (int j = y; j < ymax; j++)
 			{
-				pic.ptr<unsigned char>(j)[x] = 0;
+				pic.ptr<unsigned char>(j)[x] = 255;
 			}
 		}
 		else if (type == 2)
@@ -97,7 +97,7 @@ int drawPolynomial(Mat coef, int type, Mat &pic)
 
 			for (int j = 0; j < y; j++)
 			{
-				pic.ptr<unsigned char>(j)[x] = 0;
+				pic.ptr<unsigned char>(j)[x] = 255;
 			}
 		}
 	}
